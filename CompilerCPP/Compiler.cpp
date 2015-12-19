@@ -11,15 +11,198 @@ LangE::DataType::DataType(const std::string& name_, uint32 size_):
 #pragma endregion
 #pragma region Tokens
 #pragma region Token
-LangE::Instruction*											LangE::Token::Parse(Parser* parser) const
+LangE::Instruction*											LangE::Token::Parse(Parser* parser)
 {
 	throw std::exception("");
 }
-LangE::Instructions::Variable*								LangE::Token::ParseVariables(Parser* parser) const
+LangE::Instructions::Variable*								LangE::Token::ParseVariables(Parser* parser)
 {
 	++parser->pos;
 	return nullptr;
 }
+#pragma endregion
+#pragma region Block
+LangE::Token::Type							LangE::Tokens::Block::GetTokenType() const
+{
+	return Token::Type::Block;
+}
+#pragma endregion
+#pragma region Blocks
+#pragma region Figured
+LangE::Tokens::Block::Type					LangE::Tokens::Blocks::Figured::GetBlockType() const
+{
+	return Block::Type::Figured;
+}
+#pragma endregion
+#pragma region Figureds
+#pragma region Begin
+LangE::Tokens::Blocks::Figured::Type		LangE::Tokens::Blocks::Figureds::Begin::GetFiguredType() const
+{
+	return Figured::Type::Begin;
+}
+LangE::Instruction*							LangE::Tokens::Blocks::Figureds::Begin::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = parser->tokens;
+
+	if(block)
+	{
+		++pos;
+
+		parser->blocks.push_back(block);
+
+		while(pos < tokens->size())
+		{
+			auto &token = (*tokens)[pos];
+
+			if(token->GetTokenType() == Token::Type::Block)
+			{
+				auto tokenBlock = (Tokens::Block*)(*tokens)[pos];
+				if(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured)
+				{
+					auto tokenBlockFigured = (Tokens::Blocks::Figured*)tokenBlock;
+					if(tokenBlockFigured->GetFiguredType() == Tokens::Blocks::Figured::Type::End)
+					{
+						++pos;
+						if(parser->blocks.size() > 0 && parser->blocks.back() == block)
+						{
+							parser->blocks.pop_back();
+							return block;
+						}
+						else
+						{
+							throw std::exception("");
+						}
+					}
+				}
+			}
+
+			auto instruction = token->Parse(parser);
+			block->instructions.push_back(instruction);
+		}
+	}
+	else
+	{
+		throw std::exception("");
+	}
+
+	throw std::exception("");
+}
+LangE::Instructions::Variable*				LangE::Tokens::Blocks::Figureds::Begin::ParseVariables(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = parser->tokens;
+
+	if(block)
+	{
+		throw std::exception("");
+	}
+	else
+	{
+		block = new Instructions::Block;
+		parser->blocks.push_back(block);
+	}
+
+	++pos;
+	while(pos < tokens->size())
+	{
+		auto &token = (*tokens)[pos];
+
+		if(token->GetTokenType() == Token::Type::Block)
+		{
+			auto tokenBlock = (Tokens::Block*)(*tokens)[pos];
+			if(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured)
+			{
+				auto tokenBlockFigured = (Tokens::Blocks::Figured*)tokenBlock;
+				if(tokenBlockFigured->GetFiguredType() == Tokens::Blocks::Figured::Type::End)
+				{
+					++pos;
+					if(parser->blocks.size() > 0 && parser->blocks.back() == block)
+					{
+						parser->blocks.pop_back();
+					}
+					else
+					{
+						throw std::exception("");
+					}
+					return nullptr;
+				}
+			}
+		}
+
+		parser->AddVariable(token->ParseVariables(parser));
+	}
+
+	throw std::exception("");
+}
+#pragma endregion
+#pragma region End
+LangE::Tokens::Blocks::Figured::Type		LangE::Tokens::Blocks::Figureds::End::GetFiguredType() const
+{
+	return Figured::Type::End;
+}
+#pragma endregion
+#pragma endregion
+#pragma region Round
+LangE::Tokens::Block::Type					LangE::Tokens::Blocks::Round::GetBlockType() const
+{
+	return Block::Type::Round;
+}
+#pragma endregion
+#pragma region Rounds
+#pragma region Begin
+LangE::Tokens::Blocks::Round::Type			LangE::Tokens::Blocks::Rounds::Begin::GetRoundType() const
+{
+	return Round::Type::Begin;
+}
+#pragma endregion
+#pragma region End
+LangE::Tokens::Blocks::Round::Type			LangE::Tokens::Blocks::Rounds::End::GetRoundType() const
+{
+	return Round::Type::End;
+}
+#pragma endregion
+#pragma endregion
+#pragma region Squared
+LangE::Tokens::Block::Type					LangE::Tokens::Blocks::Squared::GetBlockType() const
+{
+	return Block::Type::Squared;
+}
+#pragma endregion
+#pragma region Squareds
+#pragma region Begin
+LangE::Tokens::Blocks::Squared::Type		LangE::Tokens::Blocks::Squareds::Begin::GetSquaredType() const
+{
+	return Squared::Type::Begin;
+}
+#pragma endregion
+#pragma region End
+LangE::Tokens::Blocks::Squared::Type		LangE::Tokens::Blocks::Squareds::End::GetSquaredType() const
+{
+	return Squared::Type::End;
+}
+#pragma endregion
+#pragma endregion
+#pragma region Angled
+LangE::Tokens::Block::Type					LangE::Tokens::Blocks::Angled::GetBlockType() const
+{
+	return Block::Type::Angled;
+}
+#pragma endregion
+#pragma region Angleds
+#pragma region Begin
+LangE::Tokens::Blocks::Angled::Type			LangE::Tokens::Blocks::Angleds::Begin::GetAngledType() const
+{
+	return Angled::Type::Begin;
+}
+#pragma endregion
+#pragma region End
+LangE::Tokens::Blocks::Angled::Type			LangE::Tokens::Blocks::Angleds::End::GetAngledType() const
+{
+	return Angled::Type::End;
+}
+#pragma endregion
+#pragma endregion
 #pragma endregion
 #pragma region Semicolon
 LangE::Token::Type											LangE::Tokens::Semicolon::GetTokenType() const
@@ -46,7 +229,7 @@ LangE::Token::Type											LangE::Tokens::Indetifier::GetTokenType() const
 {
 	return Token::Type::Indetifier;
 }
-LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser) const
+LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 {
 	auto dataType = parser->SearchDataType(name);
 	if(dataType)
@@ -181,7 +364,7 @@ LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser) c
 		}
 	}
 }
-LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(Parser* parser) const
+LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(Parser* parser) 
 {
 	auto dataType = parser->SearchDataType(name);
 	if(dataType)
@@ -248,7 +431,7 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::If::GetKeywordType
 {
 	return Keyword::Type::If;
 }
-LangE::Instruction*												LangE::Tokens::Keywords::If::Parse(Parser* parser) const
+LangE::Instruction*												LangE::Tokens::Keywords::If::Parse(Parser* parser)
 {
 	++parser->pos;
 	if(parser->pos < parser->tokens->size())
@@ -323,7 +506,7 @@ LangE::Instruction*												LangE::Tokens::Keywords::If::Parse(Parser* parser
 		throw std::exception("[.if] There is no condition");
 	}
 }
-LangE::Instructions::Variable*									LangE::Tokens::Keywords::If::ParseVariables(Parser* parser) const
+LangE::Instructions::Variable*									LangE::Tokens::Keywords::If::ParseVariables(Parser* parser)
 {
 	++parser->pos;
 	if(parser->pos < parser->tokens->size())
@@ -367,9 +550,36 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Else::GetKeywordTy
 #pragma endregion
 #pragma region Instructions
 #pragma region Instruction
-std::vector<LangE::uint8>										LangE::Instruction::Compile(Compiler* compiler) const
+std::vector<LangE::uint8>										LangE::Instruction::Compile(Compiler* compiler)
 {
 	throw std::exception("");
+}
+#pragma endregion
+#pragma region Block
+LangE::Instruction::Type										LangE::Instructions::Block::GetInstructionType() const
+{
+	return Instruction::Type::Block;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler* compiler)
+{
+	std::vector<LangE::uint8> codes;
+
+	uint32 stackOffset = compiler->stackOffset;
+
+	for(auto instruction : instructions)
+	{
+		auto code = instruction->Compile(compiler);
+		for(auto i : code) codes.push_back(i);
+	}
+
+	if(compiler->stackOffset > stackOffset)
+	{
+		auto code = compiler->Lea_ESP_LocESPPlus32(compiler->stackOffset - stackOffset);
+		for(auto i : code) codes.push_back(i);
+		compiler->stackOffset = stackOffset;
+	}
+
+	return move(codes);
 }
 #pragma endregion
 #pragma region Variable
@@ -382,7 +592,7 @@ LangE::Instruction::Type									LangE::Instructions::Variable::GetInstructionTy
 {
 	return Type::Variable;
 }
-std::vector<LangE::uint8>										LangE::Instructions::Variable::Compile(Compiler* compiler) const
+std::vector<LangE::uint8>										LangE::Instructions::Variable::Compile(Compiler* compiler)
 {
 	return move(compiler->NOP());
 }
@@ -397,7 +607,7 @@ LangE::Instruction::Type										LangE::Instructions::Definition::GetInstructio
 {
 	return Type::Definition;
 }
-std::vector<LangE::uint8>										LangE::Instructions::Definition::Compile(Compiler* compiler) const
+std::vector<LangE::uint8>										LangE::Instructions::Definition::Compile(Compiler* compiler)
 {
 	compiler->stackOffset += variable->type->size;
 	variable->stackOffset = compiler->stackOffset;
@@ -422,7 +632,7 @@ LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::If::Get
 {
 	return Keyword::Type::If;
 }
-std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Compiler* compiler) const
+std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Compiler* compiler)
 {
 	auto code = std::vector<uint8>{};
 
@@ -529,6 +739,38 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 					throw std::exception("?");
 				}
 			} break;
+			case '{':
+			{
+				tokens.push_back(new Tokens::Blocks::Figureds::Begin);
+			} break;
+			case '}':
+			{
+				tokens.push_back(new Tokens::Blocks::Figureds::End);
+			} break;
+			case '(':
+			{
+				tokens.push_back(new Tokens::Blocks::Rounds::Begin);
+			} break;
+			case ')':
+			{
+				tokens.push_back(new Tokens::Blocks::Rounds::End);
+			} break;
+			case '[':
+			{
+				tokens.push_back(new Tokens::Blocks::Squareds::Begin);
+			} break;
+			case ']':
+			{
+				tokens.push_back(new Tokens::Blocks::Squareds::End);
+			} break;
+			case '<':
+			{
+				tokens.push_back(new Tokens::Blocks::Angleds::Begin);
+			} break;
+			case '>':
+			{
+				tokens.push_back(new Tokens::Blocks::Angleds::End);
+			} break;
 			case '\'':
 			{
 				auto oi = i;
@@ -625,14 +867,40 @@ std::vector<LangE::Instruction*>								LangE::Parser::Process(std::vector<Token
 	return move(instructions);
 }
 void															LangE::Parser::AddVariable(Instructions::Variable* variable)
-{
+{	
 	if(variable)
 	{
-		variables.insert(std::pair<std::string,Instructions::Variable*>(variable->name,variable));
+		if(blocks.empty())
+		{
+			variables.insert(std::pair<std::string,Instructions::Variable*>(variable->name,variable));
+		}
+		else
+		{
+			blocks.back()->variables.insert(std::pair<std::string,Instructions::Variable*>(variable->name,variable));
+		}
 	}
 }
 LangE::DataType*												LangE::Parser::SearchDataType(const std::string& name)
 {
+	/*
+	for(auto i = blocks.rbegin(); i != blocks.rend(); ++i)
+	{
+		auto &block = *i;
+		auto dataTypeIt = block->types.find(name);
+		if(dataTypeIt != block->types.end())
+		{
+			return (*dataTypeIt).second;
+		}
+	}
+
+	auto dataTypeIt = types.find(name);
+	if(dataTypeIt != types.end())
+	{
+		return (*dataTypeIt).second;
+	}
+
+	return nullptr;
+	*/
 	auto dataTypeIt = types.find(name);
 	if(dataTypeIt != types.end())
 	{
@@ -645,7 +913,25 @@ LangE::DataType*												LangE::Parser::SearchDataType(const std::string& nam
 }
 LangE::Instructions::Variable*									LangE::Parser::SearchVariable(const std::string& name)
 {
+	for(auto i = blocks.rbegin(); i != blocks.rend(); ++i)
+	{
+		auto &block = *i;
+		auto variableIt = block->variables.find(name);
+		if(variableIt != block->variables.end())
+		{
+			return (*variableIt).second;
+		}
+	}
+
 	auto variableIt = variables.find(name);
+	if(variableIt != variables.end())
+	{
+		return (*variableIt).second;
+	}
+
+	return nullptr;
+
+	/*auto variableIt = variables.find(name);
 	if(variableIt != variables.end())
 	{
 		return (*variableIt).second;
@@ -653,7 +939,7 @@ LangE::Instructions::Variable*									LangE::Parser::SearchVariable(const std::
 	else
 	{
 		return nullptr;
-	}
+	}*/
 }
 #pragma endregion
 #pragma region Compilers

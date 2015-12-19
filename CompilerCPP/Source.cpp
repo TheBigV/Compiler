@@ -11,21 +11,6 @@ using namespace std;
 
 void main()
 {
-	/*
-	jmp 0x01 // pos + 0x01
-
-	jmp 0x00 00 00 01 // pos + 0x01
-
-	E9 01 00 00 00 => length = 5 bytes
-
-	00 00 00 01 - 00 00 00 05 // minus instruction size
-
-	FF FF FF FC
-
-	E9 FC FF FF FF // we go to FC!
-
-	*/
-
 	auto source = ([]
 	{
 		auto file = ifstream("Source.e");

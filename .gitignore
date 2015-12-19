@@ -55,3 +55,6 @@ CompilerCPP/Debug/CompilerCPP.tlog/link.write.1.tlog
 CompilerCPP/Debug/CompilerCPP.log
 *.sdf
 CompilerCPP.opensdf
+*.suo
+CompilerCPP.v12.suo
+*.suo

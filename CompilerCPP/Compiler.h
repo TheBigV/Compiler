@@ -2,6 +2,7 @@
 
 
 #include <string>
+#include <stack>
 #include <vector>
 #include <list>
 #include <map>
@@ -28,6 +29,7 @@ namespace LangE
 	struct Instruction;
 	namespace Instructions
 	{
+		struct Block;
 		struct Variable;
 		struct Definition;
 		struct Keyword;
@@ -54,6 +56,7 @@ namespace LangE
 		enum struct Type
 		{
 			None,
+			Block,
 			Semicolon,
 			Literal,
 			Indetifier,
@@ -61,11 +64,137 @@ namespace LangE
 		};
 
 		virtual Token::Type GetTokenType() const = 0;
-		virtual Instruction* Parse(Parser* parser) const;
-		virtual Instructions::Variable* ParseVariables(Parser* parser) const;
+		virtual Instruction* Parse(Parser* parser);
+		virtual Instructions::Variable* ParseVariables(Parser* parser);
 	};
 	namespace Tokens
 	{
+		struct Block:
+			public Token
+		{
+			enum struct Type
+			{
+				None,
+				Figured,
+				Round,
+				Squared,
+				Angled
+			};
+
+			Instructions::Block* block = nullptr;
+
+			virtual Token::Type GetTokenType() const override;
+			virtual Block::Type GetBlockType() const = 0;
+		};
+		namespace Blocks
+		{
+			struct Figured:
+				public Block
+			{
+				enum struct Type
+				{
+					None,
+					Begin,
+					End
+				};
+
+				virtual Block::Type GetBlockType() const override;
+				virtual Figured::Type GetFiguredType() const = 0;
+			};
+			namespace Figureds
+			{
+				struct Begin:
+					public Figured
+				{
+					virtual Figured::Type GetFiguredType() const override;
+					virtual Instruction* Parse(Parser* parser) override;
+					virtual Instructions::Variable* ParseVariables(Parser* parser) override;
+				};
+				struct End:
+					public Figured
+				{
+					virtual Figured::Type GetFiguredType() const override;
+				};
+			}
+			struct Round:
+				public Block
+			{
+				enum struct Type
+				{
+					None,
+					Begin,
+					End
+				};
+
+				virtual Block::Type GetBlockType() const override;
+				virtual Round::Type GetRoundType() const = 0;
+			};
+			namespace Rounds
+			{
+				struct Begin:
+					public Round
+				{
+					virtual Round::Type GetRoundType() const override;
+				};
+				struct End:
+					public Round
+				{
+					virtual Round::Type GetRoundType() const override;
+				};
+			}
+			struct Squared:
+				public Block
+			{
+				enum struct Type
+				{
+					None,
+					Begin,
+					End
+				};
+
+				virtual Block::Type GetBlockType() const override;
+				virtual Squared::Type GetSquaredType() const = 0;
+			};
+			namespace Squareds
+			{
+				struct Begin:
+					public Squared
+				{
+					virtual Squared::Type GetSquaredType() const override;
+				};
+				struct End:
+					public Squared
+				{
+					virtual Squared::Type GetSquaredType() const override;
+				};
+			}
+			struct Angled:
+				public Block
+			{
+				enum struct Type
+				{
+					None,
+					Begin,
+					End
+				};
+
+				virtual Block::Type GetBlockType() const override;
+				virtual Angled::Type GetAngledType() const = 0;
+			};
+			namespace Angleds
+			{
+				struct Begin:
+					public Angled
+				{
+					virtual Angled::Type GetAngledType() const override;
+				};
+				struct End:
+					public Angled
+				{
+					virtual Angled::Type GetAngledType() const override;
+				};
+			}
+		}
 		struct Semicolon:
 		public Token
 		{
@@ -90,8 +219,8 @@ namespace LangE
 			Indetifier(std::string name_);
 
 			virtual Token::Type GetTokenType() const override;
-			virtual Instruction* Parse(Parser* parser) const override;
-			virtual Instructions::Variable* ParseVariables(Parser* parser) const override;
+			virtual Instruction* Parse(Parser* parser) override;
+			virtual Instructions::Variable* ParseVariables(Parser* parser) override;
 		};
 		struct Keyword:
 			public Token
@@ -111,8 +240,8 @@ namespace LangE
 				public Keyword
 			{
 				virtual Keyword::Type GetKeywordType() const override;
-				virtual Instruction* Parse(Parser* parser) const override;
-				virtual Instructions::Variable* ParseVariables(Parser* parser) const override;
+				virtual Instruction* Parse(Parser* parser) override;
+				virtual Instructions::Variable* ParseVariables(Parser* parser) override;
 			};
 			struct Else:
 				public Keyword
@@ -127,16 +256,27 @@ namespace LangE
 		enum struct Type
 		{
 			None,
+			Block,
 			Variable,
 			Definition,
 			Keyword
 		};
 
 		virtual Instruction::Type GetInstructionType() const = 0;
-		virtual std::vector<uint8> Compile(Compiler* compiler) const;
+		virtual std::vector<uint8> Compile(Compiler* compiler);
 	};
 	namespace Instructions
 	{
+		struct Block:
+			public Instruction
+		{
+			std::vector<Instruction*> instructions;
+			//std::map<std::string,DataType*> types;
+			std::map<std::string,Instructions::Variable*> variables;
+
+			virtual Instruction::Type GetInstructionType() const override;
+			virtual std::vector<uint8> Compile(Compiler* compiler) override;
+		};
 		struct Variable:
 			public Instruction
 		{
@@ -147,7 +287,7 @@ namespace LangE
 			Variable(DataType* type_,std::string name_);
 
 			virtual Instruction::Type GetInstructionType() const override;
-			virtual std::vector<uint8> Compile(Compiler* compiler) const override;
+			virtual std::vector<uint8> Compile(Compiler* compiler) override;
 		};
 		struct Definition:
 			public Instruction
@@ -158,7 +298,7 @@ namespace LangE
 			Definition(Variable* variable_,void* value_ = nullptr);
 
 			virtual Instruction::Type GetInstructionType() const override;
-			virtual std::vector<uint8> Compile(Compiler* compiler) const override;
+			virtual std::vector<uint8> Compile(Compiler* compiler) override;
 		};
 		struct Keyword:
 			public Instruction
@@ -184,7 +324,7 @@ namespace LangE
 				If(Instructions::Variable* condition_,Instruction* positive_,Instruction* negative_);
 
 				virtual Keyword::Type GetKeywordType() const override;
-				virtual std::vector<uint8> Compile(Compiler* compiler) const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
 			};
 		}
 	};
@@ -202,6 +342,7 @@ namespace LangE
 
 		std::map<std::string,DataType*> types;
 		std::map<std::string,Instructions::Variable*> variables;
+		std::vector<Instructions::Block*> blocks;
 
 		Parser();
 
