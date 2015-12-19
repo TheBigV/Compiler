@@ -1,0 +1,755 @@
+#include "Compiler.h"
+
+
+#pragma region LangE
+#pragma region DataType
+LangE::DataType::DataType(const std::string& name_, uint32 size_):
+	name(name_),
+	size(size_)
+{
+}
+#pragma endregion
+#pragma region Tokens
+#pragma region Token
+LangE::Instruction*											LangE::Token::Parse(Parser* parser) const
+{
+	throw std::exception("");
+}
+LangE::Instructions::Variable*								LangE::Token::ParseVariables(Parser* parser) const
+{
+	++parser->pos;
+	return nullptr;
+}
+#pragma endregion
+#pragma region Semicolon
+LangE::Token::Type											LangE::Tokens::Semicolon::GetTokenType() const
+{
+	return Token::Type::Semicolon;
+}
+#pragma endregion
+#pragma region Literal
+LangE::Tokens::Literal::Literal(std::string name_):
+	name(name_)
+{
+}
+LangE::Token::Type											LangE::Tokens::Literal::GetTokenType() const
+{
+	return Token::Type::Literal;
+}
+#pragma endregion
+#pragma region Indetifier
+LangE::Tokens::Indetifier::Indetifier(std::string name_):
+	name(name_)
+{
+}
+LangE::Token::Type											LangE::Tokens::Indetifier::GetTokenType() const
+{
+	return Token::Type::Indetifier;
+}
+LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser) const
+{
+	auto dataType = parser->SearchDataType(name);
+	if(dataType)
+	{
+		++parser->pos;
+		if(parser->pos < parser->tokens->size())
+		{
+			if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Indetifier)
+			{
+				auto tokenVariable = (Tokens::Indetifier*)(*parser->tokens)[parser->pos];
+				++parser->pos;
+				if(parser->pos < parser->tokens->size())
+				{
+					auto definition = [&]()
+					{
+						auto variableName = tokenVariable->name;
+						auto variable = parser->SearchVariable(variableName);
+
+						if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+						{
+							auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
+							++parser->pos;
+
+							if(variable)
+							{
+								auto definition = new Instructions::Definition(variable);
+								return definition;
+							}
+							else
+							{
+								throw std::exception("");
+							}
+						}
+						if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Literal)
+						{
+							auto tokenLiteral = (Tokens::Literal*)(*parser->tokens)[parser->pos];
+							++parser->pos;
+
+							if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+							{
+								auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
+								++parser->pos;
+
+								auto definition = [&]()
+								{
+									if(variable->type->name == ".int8")
+									{
+										try
+										{
+											auto value = new uint8((uint8)std::strtol(tokenLiteral->name.c_str(),nullptr,10));
+											auto definition = new Instructions::Definition(variable,value);
+											return definition;
+										}
+										catch(...)
+										{
+											throw std::exception("");
+										}
+									}
+									throw std::exception("");
+								}();
+
+								return definition;
+							}
+							else
+							{
+								throw std::exception("");
+							}
+							/*auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
+							++parser->pos;
+
+							auto variableName = tokenVariable->name;
+							auto variable = parser->SearchVariable(variableName);
+
+							if(variable)
+							{
+								auto definition = new Instructions::Definition(variable);
+
+								return definition;
+							}
+							else
+							{
+								throw std::exception("");
+							}*/
+						}
+						throw std::exception("");
+					}();
+					return definition;
+				}
+				else
+				{
+					throw std::exception("");
+				}
+			}
+			else
+			{
+				throw std::exception("");
+			}
+		}
+		else
+		{
+			throw std::exception("");
+		}
+	}
+	else
+	{
+		auto variable = parser->SearchVariable(name);
+		if(variable)
+		{
+			++parser->pos;
+			if(parser->pos < parser->tokens->size())
+			{
+				if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+				{
+					auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
+					++parser->pos;
+
+					return variable;
+				}
+				else
+				{
+					throw std::exception("");
+				}
+			}
+			else
+			{
+				throw std::exception("");
+			}
+		}
+		else
+		{
+			throw std::exception("");
+		}
+	}
+}
+LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(Parser* parser) const
+{
+	auto dataType = parser->SearchDataType(name);
+	if(dataType)
+	{
+		++parser->pos;
+		if(parser->pos < parser->tokens->size())
+		{
+			if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Indetifier)
+			{
+				auto tokenVariable = (Tokens::Indetifier*)(*parser->tokens)[parser->pos];
+				++parser->pos;
+				if(parser->pos < parser->tokens->size())
+				{
+					if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+					{
+						auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
+						++parser->pos;
+
+						auto variable = new Instructions::Variable(dataType, tokenVariable->name);
+
+						return variable;
+					}
+					else
+					{
+						return nullptr;
+					}
+				}
+				else
+				{
+					return nullptr;
+				}
+			}
+			else
+			{
+				return nullptr;
+
+			}
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+	else
+	{
+		++parser->pos;
+		if(parser->pos < parser->tokens->size() && (*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+		{
+			++parser->pos;
+		}
+		return nullptr;
+	}
+}
+#pragma endregion
+#pragma region Keywords
+#pragma region Keyword
+LangE::Token::Type											LangE::Tokens::Keyword::GetTokenType() const
+{
+	return Token::Type::Keyword;
+}
+#pragma endregion
+#pragma region If
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::If::GetKeywordType() const
+{
+	return Keyword::Type::If;
+}
+LangE::Instruction*												LangE::Tokens::Keywords::If::Parse(Parser* parser) const
+{
+	++parser->pos;
+	if(parser->pos < parser->tokens->size())
+	{
+		auto condition = (*parser->tokens)[parser->pos]->Parse(parser);
+		if(condition)
+		{
+			if(condition->GetInstructionType() == Instruction::Type::Variable)
+			{
+				auto conditionVariable = (Instructions::Variable*)condition;
+				if(parser->pos < parser->tokens->size())
+				{
+					auto positive = (*parser->tokens)[parser->pos]->Parse(parser);
+					if(positive)
+					{
+						auto keywordIf = new Instructions::Keywords::If(conditionVariable,positive,nullptr);
+						return keywordIf;
+					}
+					else
+					{
+						throw std::exception("");
+					}
+				}
+				else
+				{
+					throw std::exception("");
+				}
+			}
+			else
+			{
+				throw std::exception();
+			}
+		}
+		else
+		{
+			throw std::exception("");
+		}
+	}
+	else
+	{
+		throw std::exception("");
+	}
+}
+LangE::Instructions::Variable*									LangE::Tokens::Keywords::If::ParseVariables(Parser* parser) const
+{
+	++parser->pos;
+	if(parser->pos < parser->tokens->size())
+	{
+		auto condition = (*parser->tokens)[parser->pos]->ParseVariables(parser);
+		if(parser->pos < parser->tokens->size())
+		{
+			auto positive = (*parser->tokens)[parser->pos]->ParseVariables(parser);
+		}
+		else
+		{
+			throw std::exception("");
+		}
+		return nullptr;
+	}
+	else
+	{
+		throw std::exception("");
+	}
+
+	/*while(parser->pos < parser->tokens->size() && (*parser->tokens)[parser->pos]->GetTokenType() != Token::Type::Semicolon) ++parser->pos;
+	if(parser->pos < parser->tokens->size())
+	{
+		++parser->pos;
+		while(parser->pos < parser->tokens->size() && (*parser->tokens)[parser->pos]->GetTokenType() != Token::Type::Semicolon) ++parser->pos;
+		return nullptr;
+	}
+	else
+	{
+		throw std::exception("");
+	}*/
+}
+#pragma endregion
+#pragma endregion
+#pragma endregion
+#pragma region Instructions
+#pragma region Instruction
+std::vector<LangE::uint8>										LangE::Instruction::Compile(Compiler* compiler) const
+{
+	throw std::exception("");
+}
+#pragma endregion
+#pragma region Variable
+LangE::Instructions::Variable::Variable(DataType* type_,std::string name_):
+	type(type_),
+	name(name_)
+{
+}
+LangE::Instruction::Type									LangE::Instructions::Variable::GetInstructionType() const
+{
+	return Type::Variable;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Variable::Compile(Compiler* compiler) const
+{
+	return move(compiler->NOP());
+}
+#pragma endregion
+#pragma region Definition
+LangE::Instructions::Definition::Definition(Variable* variable_,void* value_):
+	variable(variable_),
+	value(value_)
+{
+}
+LangE::Instruction::Type										LangE::Instructions::Definition::GetInstructionType() const
+{
+	return Type::Definition;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Definition::Compile(Compiler* compiler) const
+{
+	compiler->stackOffset += variable->type->size;
+	variable->stackOffset = compiler->stackOffset;
+	return compiler->Lea_ESP_LocESPPlus32(Compiler::Inverse(variable->type->size));
+	//return compiler->Push8(0x01);
+	//return std::vector<uint8>{0x00};
+}
+#pragma endregion
+#pragma region Keywords
+#pragma region Keyword
+LangE::Instruction::Type					LangE::Instructions::Keyword::GetInstructionType() const
+{
+	return Instruction::Type::Keyword;
+}
+#pragma endregion
+#pragma region If
+LangE::Instructions::Keywords::If::If(Instructions::Variable* condition_,Instruction* positive_,Instruction* negative_):
+	condition(condition_),positive(positive_),negative(negative_)
+{
+}
+LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::If::GetKeywordType() const
+{
+	return Keyword::Type::If;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Compiler* compiler) const
+{
+	auto code = std::vector<uint8>{};
+
+	auto conditionByteRelativeLocation = compiler->stackOffset - condition->stackOffset;
+	auto conditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(conditionByteRelativeLocation));
+
+	auto convertionByteToWord = compiler->CBW();
+	auto convertionWordToDoubleWord = compiler->CWD();
+
+	//auto positiveCode = std::vector<uint8>{0x90};
+	auto positiveCode = positive->Compile(compiler);
+	auto jumpSize = positiveCode.size();
+
+	//auto jumpCode = compiler->Jump32(jumpSize);
+	auto jumpCode = compiler->JNZ32(jumpSize);
+
+	//auto endCode = std::vector<uint8>{0x90};
+
+	for(auto i : conditionCode) code.push_back(i);
+	for(auto i : convertionByteToWord) code.push_back(i);
+	for(auto i : convertionWordToDoubleWord) code.push_back(i);
+	for(auto i : jumpCode) code.push_back(i);
+	for(auto i : positiveCode) code.push_back(i);
+	//for(auto i : endCode) code.push_back(i);
+
+	return code;
+}
+#pragma endregion
+#pragma endregion
+#pragma endregion
+#pragma region Lexer
+std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& source)
+{
+	std::vector<Token*> tokens;
+
+	for(size_t i = 0; i < source.size(); ++i)
+	{
+		auto symbol = source[i];
+
+		switch(symbol)
+		{
+			case ' ': break;
+			case '\r': break;
+			case '\n': break;
+			case '\t': break;
+			case ';':
+			{
+				tokens.push_back(new Tokens::Semicolon);
+			} break;
+			case '.':
+			{
+				auto oi = i;
+				++i;
+				while(i < source.size() && (isLetter(source[i]) || isDigit(source[i]))) ++i;
+
+				if(i < source.size())
+				{
+					if(isWhiteSpace(source[i]))
+					{
+						auto name = source.substr(oi,i - oi);
+
+						([&]()
+						{
+							if(name == ".int8")
+							{
+								tokens.push_back(new Tokens::Indetifier(name)); --i; return;
+							}
+							if(name == ".if")
+							{
+								tokens.push_back(new Tokens::Keywords::If); --i; return;
+							}
+							throw std::exception("unsupported keyword type");
+						})();
+					}
+					else
+					{
+					}
+				}
+				else
+				{
+					throw std::exception("?");
+				}
+			} break;
+			case '\'':
+			{
+				auto oi = i;
+				while(++i < source.size() && source[i] != '\'');
+
+				if(source[i] == '\'')
+				{
+					try
+					{
+						//++i;
+						auto valueString = source.substr(oi,i - oi);
+						//auto name = std::strtol(.c_str(),nullptr,10);
+						tokens.push_back(new Tokens::Literal(valueString));
+					}
+					catch(...)
+					{
+						throw std::exception("");
+					}
+				}
+				else
+				{
+					throw std::exception("");
+				}
+			} break;
+			default:
+			{
+				if(isLetter(symbol) || isDigit(symbol))
+				{
+					auto oi = i;
+					++i;
+					while(i < source.size() && isLetter(source[i])) ++i;
+
+					auto name = source.substr(oi,i - oi);
+					tokens.push_back(new Tokens::Indetifier(name));
+					--i;
+				}
+				else
+				{
+					throw std::exception("unsupported symbol type");
+				}
+			}
+		}
+	}
+
+	return move(tokens);
+}
+#pragma endregion
+#pragma region Parser
+std::list<LangE::DataType*> LangE::Parser::basicTypes = {
+	new LangE::DataType(".int8",1)
+};
+LangE::Parser::Parser()
+{
+	for(auto i : basicTypes)
+	{
+		types.insert(std::pair<std::string,DataType*>(i->name,i));
+	}
+}
+std::vector<LangE::Instruction*>										LangE::Parser::Process(std::vector<Token*> tokens_)
+{
+	std::vector<LangE::Instruction*> instructions;
+
+	tokens = &tokens_;
+
+	// types gather
+	types;
+	{
+		//for(auto i : types) delete i.second;
+		//types.clear();
+	}
+
+	// variables gather
+	variables;
+	{
+		for(auto i : variables) delete i.second;
+		variables.clear();
+
+		pos = 0;
+		while(pos < tokens->size())
+		{
+			auto token = (*tokens)[pos];
+			AddVariable(token->ParseVariables(this));
+		}
+	}
+
+	pos = 0;
+	while(pos < tokens->size())
+	{
+		auto token = (*tokens)[pos];
+		auto instruction = token->Parse(this);
+		if(instruction) instructions.push_back(instruction);
+	}
+
+	return move(instructions);
+}
+void															LangE::Parser::AddVariable(Instructions::Variable* variable)
+{
+	if(variable)
+	{
+		variables.insert(std::pair<std::string,Instructions::Variable*>(variable->name,variable));
+	}
+}
+LangE::DataType*												LangE::Parser::SearchDataType(const std::string& name)
+{
+	auto dataTypeIt = types.find(name);
+	if(dataTypeIt != types.end())
+	{
+		return (*dataTypeIt).second;
+	}
+	else
+	{
+		return nullptr;
+	}
+}
+LangE::Instructions::Variable*									LangE::Parser::SearchVariable(const std::string& name)
+{
+	auto variableIt = variables.find(name);
+	if(variableIt != variables.end())
+	{
+		return (*variableIt).second;
+	}
+	else
+	{
+		return nullptr;
+	}
+}
+#pragma endregion
+#pragma region Compilers
+#pragma region ASM86
+#pragma region Commands
+#pragma region Nop
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::NOP()
+{
+	return std::vector<uint8>{0x90};
+}
+#pragma endregion
+#pragma region Convertion
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::CBW()
+{
+	return std::vector<uint8>{0x66,0x98};
+}
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::CWD()
+{
+	return std::vector<uint8>{0x66,0x99};
+}
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::CDQ()
+{
+	return std::vector<uint8>{0x99};
+}
+#pragma endregion
+#pragma region Push/Pop
+std::vector<LangE::uint8>										LangE::Compilers::ASM86::Push8(uint8 value)
+{
+	return std::vector<uint8>{0x6A, value};
+}
+#pragma endregion
+#pragma region Jump
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JZ32(uint32 value)
+{
+	auto jmpSize = value;
+	return std::vector<uint8>{0x0F,0x84,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
+}
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(uint32 value)
+{
+	auto jmpSize = value;
+	return std::vector<uint8>{0x0F,0x85,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
+}
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::Jump32(uint32 value)
+{
+	auto jmpSize = value;
+	return std::vector<uint8>{0xE9,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
+}
+#pragma endregion
+#pragma region Mov
+#pragma region ETX, 32
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::Mov_EAX_32(uint32 value)
+{
+	return std::vector<uint8>{0x8B,(uint8)(value >> 0),(uint8)(value >> 8),(uint8)(value >> 16),(uint8)(value >> 24)};
+}
+#pragma endregion
+#pragma region ETX, [ETX + 32]
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::Mov_AL_LOC_ESPplus32(uint32 value)
+{
+	return std::vector<uint8>{0x8A,0x84,0x24,(uint8)(value >> 0),(uint8)(value >> 8),(uint8)(value >> 16),(uint8)(value >> 24)};
+}
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::Mov_EAX_LOC_ESPplus32(uint32 value)
+{
+	return std::vector<uint8>{0x8B,0x84,0x24,(uint8)(value >> 0),(uint8)(value >> 8),(uint8)(value >> 16),(uint8)(value >> 24)};
+}
+#pragma endregion
+#pragma endregion
+#pragma region Lea
+std::vector<LangE::uint8>										LangE::Compilers::ASM86::Lea_ESP_LocESPPlus8(uint8 value)
+{
+	return std::vector<uint8>{0x8D,0x64,0x24,value};
+}
+std::vector<LangE::uint8>										LangE::Compilers::ASM86::Lea_ESP_LocESPPlus32(uint32 value)
+{
+	return std::vector<uint8>{0x8D,0xA4,0x24,(uint8)(value >> 0),(uint8)(value >> 8),(uint8)(value >> 16),(uint8)(value >> 24)};
+}
+#pragma endregion
+#pragma endregion
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::Process(std::vector<Instruction*> instructions)
+{
+	std::vector<LangE::uint8> codes;
+
+	stackOffset = 0;
+
+	for(auto instruction : instructions)
+	{
+		auto code = instruction->Compile(this);
+		for(auto i : code) codes.push_back(i);
+	}
+
+	if(stackOffset > 0)
+	{
+		auto code = Lea_ESP_LocESPPlus32(stackOffset);
+		for(auto i : code) codes.push_back(i);
+	}
+
+	return move(codes);
+}
+#pragma endregion
+#pragma endregion
+#pragma region Func
+bool LangE::isDigit(char c)
+{
+	return isdigit(c) != 0;
+}
+bool LangE::isLetter(char c)
+{
+	return isalpha(c) != 0;
+}
+bool LangE::isWhiteSpace(char c)
+{
+	return c == ' ';
+}
+std::vector<LangE::uint8>										LangE::Compile(const std::string& source)
+{
+	Lexer lexer;
+	Parser parser;
+	Compilers::ASM86 compilerASM86;
+
+	auto tokens = lexer.Process(source);
+	auto instructions = parser.Process(tokens);
+	auto code = compilerASM86.Process(instructions);
+
+	return move(code);
+}
+#pragma endregion
+#pragma endregion
+
+#pragma region
+#pragma endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
