@@ -45,3 +45,11 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.pdb
+Debug/CompilerCPP.exe
+*.idb
+Debug/CompilerCPP.ilk
+*.obj
+CompilerCPP/Debug/CompilerCPP.tlog/link.write.1.tlog
+*.tlog
+CompilerCPP/Debug/CompilerCPP.log
