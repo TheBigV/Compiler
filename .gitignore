@@ -53,3 +53,5 @@ Debug/CompilerCPP.ilk
 CompilerCPP/Debug/CompilerCPP.tlog/link.write.1.tlog
 *.tlog
 CompilerCPP/Debug/CompilerCPP.log
+*.sdf
+CompilerCPP.opensdf
