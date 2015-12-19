@@ -1,0 +1,37 @@
+glyph:
+	digit:
+	0-9
+	letter:
+	a-z, A-Z, _
+	bracket:
+	{}, (), <>, []
+	string:
+	'', ""
+	marker:
+	~, !, @, #, $, %, ^, &, 8, -, +, *, /, \, |, <, >, =
+	special:
+	'.', ',', ';', ':',  
+
+indetifiers:
+Any uninterrupted sequence of digit/letter or marker are indetifier
+	examples:
+		correct:
+			a, a1, 1a, *, *=, =*, &^@
+		incorrect:
+			.a, *a, =a=, 1.a
+
+literals:
+Any sequence beginning with \', and ending with \' are literal
+
+keywords:
+	[.if .else]
+		.if %condition%; %expression%
+		execute %expression% if %condition% are true
+	
+		.if %condition%; %expression1%
+		.else %expression2%
+		execute %expression1% if %condition% are true, otherwise %expression2%
+
+types:
+.int8 - signed 8-bit integer
+
