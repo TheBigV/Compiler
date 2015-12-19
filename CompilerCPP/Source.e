@@ -2,7 +2,12 @@
 
 .int8 b;
 
-.if a; a;
-.else b;
+.if a;
+	.if b;
+		b;
+	.else
+		b;
+.else
+	a;
 
 

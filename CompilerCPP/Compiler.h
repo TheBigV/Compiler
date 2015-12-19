@@ -99,7 +99,7 @@ namespace LangE
 			enum struct Type
 			{
 				None,
-				If
+				If, Else
 			};
 
 			virtual Token::Type GetTokenType() const override;
@@ -113,6 +113,11 @@ namespace LangE
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual Instruction* Parse(Parser* parser) const override;
 				virtual Instructions::Variable* ParseVariables(Parser* parser) const override;
+			};
+			struct Else:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
 			};
 		}
 	}
@@ -228,7 +233,7 @@ namespace LangE
 #pragma region Jump
 		virtual std::vector<uint8> JZ32(uint32 value) = 0; // jump if zero main+int32
 		virtual std::vector<uint8> JNZ32(uint32 value) = 0; // jump if not zero main+int32
-		virtual std::vector<uint8> Jump32(uint32 value) = 0; // jump main+int32
+		virtual std::vector<uint8> JMP32(uint32 value) = 0; // jump main+int32
 #pragma endregion
 #pragma region Mov
 #pragma region ETX, 32
@@ -267,7 +272,7 @@ namespace LangE
 #pragma region Jump
 			virtual std::vector<uint8> JZ32(uint32 value) override;
 			virtual std::vector<uint8> JNZ32(uint32 value) override;
-			virtual std::vector<uint8> Jump32(uint32 value) override;
+			virtual std::vector<uint8> JMP32(uint32 value) override;
 #pragma endregion
 #pragma region Mov
 #pragma region ETX, 32

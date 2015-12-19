@@ -259,37 +259,68 @@ LangE::Instruction*												LangE::Tokens::Keywords::If::Parse(Parser* parser
 			if(condition->GetInstructionType() == Instruction::Type::Variable)
 			{
 				auto conditionVariable = (Instructions::Variable*)condition;
+
 				if(parser->pos < parser->tokens->size())
 				{
 					auto positive = (*parser->tokens)[parser->pos]->Parse(parser);
 					if(positive)
 					{
+						if(parser->pos < parser->tokens->size())
+						{
+							auto tmpToken = (*parser->tokens)[parser->pos];
+							if(tmpToken->GetTokenType() == Token::Type::Keyword)
+							{
+								auto tmpTokenKeyword = (Tokens::Keyword*)tmpToken;
+								if(tmpTokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Else)
+								{
+									auto tmpTokenKeywordElse = (Tokens::Keywords::Else*)tmpTokenKeyword;
+
+									if(++parser->pos < parser->tokens->size())
+									{
+										auto negative = (*parser->tokens)[parser->pos]->Parse(parser);
+										if(negative)
+										{
+											auto keywordIfElse = new Instructions::Keywords::If(conditionVariable,positive,negative);
+											return keywordIfElse;
+										}
+										else
+										{
+											throw std::exception("");
+										}
+									}
+									else
+									{
+										throw std::exception("");
+									}
+								}
+							}
+						}
 						auto keywordIf = new Instructions::Keywords::If(conditionVariable,positive,nullptr);
 						return keywordIf;
 					}
 					else
 					{
-						throw std::exception("");
+						throw std::exception("[.if] Can't parse positive instruction");
 					}
 				}
 				else
 				{
-					throw std::exception("");
+					throw std::exception("[.if] There is no positive instruction");
 				}
 			}
 			else
 			{
-				throw std::exception();
+				throw std::exception("[.if]Condition are not variable");
 			}
 		}
 		else
 		{
-			throw std::exception("");
+			throw std::exception("[.if] Can't parse condition");
 		}
 	}
 	else
 	{
-		throw std::exception("");
+		throw std::exception("[.if] There is no condition");
 	}
 }
 LangE::Instructions::Variable*									LangE::Tokens::Keywords::If::ParseVariables(Parser* parser) const
@@ -324,6 +355,12 @@ LangE::Instructions::Variable*									LangE::Tokens::Keywords::If::ParseVariabl
 	{
 		throw std::exception("");
 	}*/
+}
+#pragma endregion
+#pragma region Else
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Else::GetKeywordType() const
+{
+	return Keyword::Type::Else;
 }
 #pragma endregion
 #pragma endregion
@@ -395,21 +432,40 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 	auto convertionByteToWord = compiler->CBW();
 	auto convertionWordToDoubleWord = compiler->CWD();
 
-	//auto positiveCode = std::vector<uint8>{0x90};
-	auto positiveCode = positive->Compile(compiler);
-	auto jumpSize = positiveCode.size();
+	if(negative)
+	{
+		auto positiveCode = positive->Compile(compiler);
 
-	//auto jumpCode = compiler->Jump32(jumpSize);
-	auto jumpCode = compiler->JNZ32(jumpSize);
+		auto negativeCode = negative->Compile(compiler);
 
-	//auto endCode = std::vector<uint8>{0x90};
+		auto positiveJumpSize = negativeCode.size();
+		auto positiveJumpCode = compiler->JMP32(positiveJumpSize);	// jump to the end of .else
 
-	for(auto i : conditionCode) code.push_back(i);
-	for(auto i : convertionByteToWord) code.push_back(i);
-	for(auto i : convertionWordToDoubleWord) code.push_back(i);
-	for(auto i : jumpCode) code.push_back(i);
-	for(auto i : positiveCode) code.push_back(i);
-	//for(auto i : endCode) code.push_back(i);
+		auto negativeJumpSize = positiveCode.size() + positiveJumpCode.size();
+		auto negativeJumpCode = compiler->JNZ32(negativeJumpSize); // jump to the .else
+
+
+		for(auto i : conditionCode) code.push_back(i);
+		for(auto i : convertionByteToWord) code.push_back(i);
+		for(auto i : convertionWordToDoubleWord) code.push_back(i);
+		for(auto i : negativeJumpCode) code.push_back(i);
+		for(auto i : positiveCode) code.push_back(i);
+		for(auto i : positiveJumpCode) code.push_back(i);
+		for(auto i : negativeCode) code.push_back(i);
+	}
+	else
+	{
+		auto positiveCode = positive->Compile(compiler);
+		auto negativeJumpSize = positiveCode.size();
+
+		auto negativeJumpCode = compiler->JNZ32(negativeJumpSize); // jump to the end of .if
+
+		for(auto i : conditionCode) code.push_back(i);
+		for(auto i : convertionByteToWord) code.push_back(i);
+		for(auto i : convertionWordToDoubleWord) code.push_back(i);
+		for(auto i : negativeJumpCode) code.push_back(i);
+		for(auto i : positiveCode) code.push_back(i);
+	}
 
 	return code;
 }
@@ -456,6 +512,10 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".if")
 							{
 								tokens.push_back(new Tokens::Keywords::If); --i; return;
+							}
+							if(name == ".else")
+							{
+								tokens.push_back(new Tokens::Keywords::Else); --i; return;
 							}
 							throw std::exception("unsupported keyword type");
 						})();
@@ -527,7 +587,7 @@ LangE::Parser::Parser()
 		types.insert(std::pair<std::string,DataType*>(i->name,i));
 	}
 }
-std::vector<LangE::Instruction*>										LangE::Parser::Process(std::vector<Token*> tokens_)
+std::vector<LangE::Instruction*>								LangE::Parser::Process(std::vector<Token*> tokens_)
 {
 	std::vector<LangE::Instruction*> instructions;
 
@@ -636,7 +696,7 @@ std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(uint32 value)
 	auto jmpSize = value;
 	return std::vector<uint8>{0x0F,0x85,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
 }
-std::vector<LangE::uint8>											LangE::Compilers::ASM86::Jump32(uint32 value)
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JMP32(uint32 value)
 {
 	auto jmpSize = value;
 	return std::vector<uint8>{0xE9,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
@@ -704,7 +764,7 @@ bool LangE::isLetter(char c)
 }
 bool LangE::isWhiteSpace(char c)
 {
-	return c == ' ';
+	return c == ' ' || c == '\t' || c == '\n';
 }
 std::vector<LangE::uint8>										LangE::Compile(const std::string& source)
 {
