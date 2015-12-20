@@ -579,6 +579,31 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Begin::GetKeywordT
 {
 	return Keyword::Type::Begin;
 }
+LangE::Instruction*												LangE::Tokens::Keywords::Begin::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto tokens = *parser->tokens;
+
+	if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+	{
+		++pos;
+
+		if(!parser->blocks.empty())
+		{
+			auto block = parser->blocks.back();
+			auto keywordBegin = new Instructions::Keywords::Begin(block);
+			return keywordBegin;
+		}
+		else
+		{
+			throw std::exception("[.begin] can't find block");
+		}
+	}
+	else
+	{
+		throw std::exception("[.begin] no semicolon ahead");
+	}
+}
 #pragma endregion
 #pragma region End
 LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::End::GetKeywordType() const
@@ -636,6 +661,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler*
 
 	stackOffset = compiler->stackOffset;
 
+	std::vector<Keywords::Begin*> jumpBegin;
 	std::vector<Keywords::End*> jumpEnd;
 
 	for(auto instruction : instructions)
@@ -645,13 +671,25 @@ std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler*
 		if(instruction->GetInstructionType() == Instruction::Type::Keyword)
 		{
 			auto keyword = (Instructions::Keyword*)instruction;
-			if(keyword->GetKeywordType() == Instructions::Keyword::Type::End)
+			[&]()
 			{
-				auto keywordEnd = (Instructions::Keywords::End*)keyword;
-				keywordEnd->beginJump += codes.size();
-				keywordEnd->endJump += codes.size();
-				jumpEnd.push_back(keywordEnd);
-			}
+				if(keyword->GetKeywordType() == Instructions::Keyword::Type::Begin)
+				{
+					auto keywordBegin = (Instructions::Keywords::Begin*)keyword;
+					keywordBegin->beginJump += codes.size();
+					keywordBegin->endJump += codes.size();
+					jumpBegin.push_back(keywordBegin);
+					return;
+				}
+				if(keyword->GetKeywordType() == Instructions::Keyword::Type::End)
+				{
+					auto keywordEnd = (Instructions::Keywords::End*)keyword;
+					keywordEnd->beginJump += codes.size();
+					keywordEnd->endJump += codes.size();
+					jumpEnd.push_back(keywordEnd);
+					return;
+				}
+			}();
 		}
 
 		for(auto i : code) codes.push_back(i);
@@ -665,9 +703,18 @@ std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler*
 		compiler->stackOffset = stackOffset;
 	}
 
+	for(auto i : jumpBegin)
+	{
+		auto jumpSize = -sint32(i->endJump);// -sint32(codes.size());
+		auto jumpCode = compiler->JMP32(jumpSize);
+
+		for(std::size_t j = 0; j < jumpCode.size(); ++j)
+		{
+			codes[i->beginJump + j] = jumpCode[j];
+		}
+	}
 	for(auto i : jumpEnd)
 	{
-		auto offset = compiler->stackOffset - i->stackOffset;
 		auto jumpSize = codes.size() - i->endJump;
 		auto jumpCode = compiler->JMP32(jumpSize);
 
@@ -778,6 +825,35 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 	return code;
 }
 #pragma endregion
+#pragma region Begin
+LangE::Instructions::Keywords::Begin::Begin(Block* block_):
+	block(block_)
+{
+}
+LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::Begin::GetKeywordType() const
+{
+	return Keyword::Type::Begin;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Keywords::Begin::Compile(Compiler* compiler)
+{
+	auto code = std::vector<uint8>{};
+
+	auto offset = compiler->stackOffset - block->stackOffset;
+	if(offset > 0)
+	{
+		auto codeStackFree = compiler->Lea_ESP_LocESPPlus32(offset);
+		for(auto i : codeStackFree) code.push_back(i);
+	}
+
+	auto jumpCode = compiler->JMP32(0);
+
+	beginJump = code.size();
+	for(auto i : jumpCode) code.push_back(i);
+	endJump = code.size();
+
+	return code;
+}
+#pragma endregion
 #pragma region End
 LangE::Instructions::Keywords::End::End(Block* block_):
 	block(block_)
@@ -791,9 +867,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::End::Compile(C
 {
 	auto code = std::vector<uint8>{};
 
-	stackOffset = block->stackOffset;
-
-	auto offset = compiler->stackOffset - stackOffset;
+	auto offset = compiler->stackOffset - block->stackOffset;
 	if(offset > 0)
 	{
 		auto codeStackFree = compiler->Lea_ESP_LocESPPlus32(offset);
@@ -855,6 +929,10 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".else")
 							{
 								tokens.push_back(new Tokens::Keywords::Else); --i; return;
+							}
+							if(name == ".begin")
+							{
+								tokens.push_back(new Tokens::Keywords::Begin); --i; return;
 							}
 							if(name == ".end")
 							{
@@ -1118,7 +1196,7 @@ std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(sint32 value)
 std::vector<LangE::uint8>											LangE::Compilers::ASM86::JMP32(sint32 value)
 {
 	auto jmpSize = value;
-	return std::vector<uint8>{0xE9,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
+	return std::vector<uint8>{0xE9,(uint8)(jmpSize >> 0),(uint8)(jmpSize >> 8),(uint8)(jmpSize >> 16),(uint8)(jmpSize >> 24)};
 }
 #pragma endregion
 #pragma region Mov

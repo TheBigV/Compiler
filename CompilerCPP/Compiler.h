@@ -257,6 +257,7 @@ namespace LangE
 				public Keyword
 			{
 				virtual Keyword::Type GetKeywordType() const override;
+				virtual Instruction* Parse(Parser* parser) override;
 			};
 			struct End:
 				public Keyword
@@ -328,7 +329,7 @@ namespace LangE
 			{
 				None,
 				If,
-				End
+				Begin, End
 			};
 
 			virtual Instruction::Type GetInstructionType() const override;
@@ -348,11 +349,22 @@ namespace LangE
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual std::vector<uint8> Compile(Compiler* compiler) override;
 			};
+			struct Begin:
+				public Keyword
+			{
+				Block*const block;
+				std::size_t beginJump;
+				std::size_t endJump;
+
+				Begin(Block* block_);
+
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
+			};
 			struct End:
 				public Keyword
 			{
 				Block*const block;
-				uint32 stackOffset;
 				std::size_t beginJump;
 				std::size_t endJump;
 

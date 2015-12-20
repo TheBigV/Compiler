@@ -23,6 +23,7 @@ blocks:
 				myBlock { ... }
 			incorrect:
 				myBlock; { ... }
+	You can jump within a block, using .begin and .end keywords
 
 indetifiers:
 	Any uninterrupted sequence of digit/letter or marker are indetifier
@@ -44,9 +45,11 @@ keywords:
 		.else %expression2%
 		execute %expression1% if %condition% are true, otherwise %expression2%
 
-	[.end]
+	[.begin .end]
+		.begin;
+		Go to the begin of the current block. Use only within the blocks
 		.end;
-		Go to the end of current block. Use only within the blocks
+		Go to the end of the current block. Use only within the blocks
 
 types:
 	.int8 - signed 8-bit integer
@@ -54,5 +57,5 @@ types:
 current features aviable:
 	{} blocks
 	.if/.else keywords
-	.end keyword
+	.begin/.end keywords
 	.int8 type
