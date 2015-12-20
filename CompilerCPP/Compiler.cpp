@@ -574,6 +574,43 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Else::GetKeywordTy
 	return Keyword::Type::Else;
 }
 #pragma endregion
+#pragma region Begin
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Begin::GetKeywordType() const
+{
+	return Keyword::Type::Begin;
+}
+#pragma endregion
+#pragma region End
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::End::GetKeywordType() const
+{
+	return Keyword::Type::End;
+}
+LangE::Instruction*												LangE::Tokens::Keywords::End::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto tokens = *parser->tokens;
+
+	if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+	{
+		++pos;
+
+		if(!parser->blocks.empty())
+		{
+			auto block = parser->blocks.back();
+			auto keywordEnd = new Instructions::Keywords::End(block);
+			return keywordEnd;
+		}
+		else
+		{
+			throw std::exception("[.end] can't find block");
+		}
+	}
+	else
+	{
+		throw std::exception("[.end] no semicolon ahead");
+	}
+}
+#pragma endregion
 #pragma endregion
 #pragma endregion
 #pragma region Instructions
@@ -597,19 +634,47 @@ std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler*
 {
 	std::vector<LangE::uint8> codes;
 
-	uint32 stackOffset = compiler->stackOffset;
+	stackOffset = compiler->stackOffset;
+
+	std::vector<Keywords::End*> jumpEnd;
 
 	for(auto instruction : instructions)
 	{
 		auto code = instruction->Compile(compiler);
+
+		if(instruction->GetInstructionType() == Instruction::Type::Keyword)
+		{
+			auto keyword = (Instructions::Keyword*)instruction;
+			if(keyword->GetKeywordType() == Instructions::Keyword::Type::End)
+			{
+				auto keywordEnd = (Instructions::Keywords::End*)keyword;
+				keywordEnd->beginJump += codes.size();
+				keywordEnd->endJump += codes.size();
+				jumpEnd.push_back(keywordEnd);
+			}
+		}
+
 		for(auto i : code) codes.push_back(i);
 	}
 
-	if(compiler->stackOffset > stackOffset)
+	auto offset = compiler->stackOffset - stackOffset;
+	if(offset)
 	{
-		auto code = compiler->Lea_ESP_LocESPPlus32(compiler->stackOffset - stackOffset);
+		auto code = compiler->Lea_ESP_LocESPPlus32(offset);
 		for(auto i : code) codes.push_back(i);
 		compiler->stackOffset = stackOffset;
+	}
+
+	for(auto i : jumpEnd)
+	{
+		auto offset = compiler->stackOffset - i->stackOffset;
+		auto jumpSize = codes.size() - i->endJump;
+		auto jumpCode = compiler->JMP32(jumpSize);
+
+		for(std::size_t j = 0; j < jumpCode.size(); ++j)
+		{
+			codes[i->beginJump + j] = jumpCode[j];
+		}
 	}
 
 	return move(codes);
@@ -713,6 +778,37 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 	return code;
 }
 #pragma endregion
+#pragma region End
+LangE::Instructions::Keywords::End::End(Block* block_):
+	block(block_)
+{
+}
+LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::End::GetKeywordType() const
+{
+	return Keyword::Type::End;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Keywords::End::Compile(Compiler* compiler)
+{
+	auto code = std::vector<uint8>{};
+
+	stackOffset = block->stackOffset;
+
+	auto offset = compiler->stackOffset - stackOffset;
+	if(offset > 0)
+	{
+		auto codeStackFree = compiler->Lea_ESP_LocESPPlus32(offset);
+		for(auto i : codeStackFree) code.push_back(i);
+	}
+
+	auto jumpCode = compiler->JMP32(0);
+	
+	beginJump = code.size();
+	for(auto i : jumpCode) code.push_back(i);
+	endJump = code.size();
+
+	return code;
+}
+#pragma endregion
 #pragma endregion
 #pragma endregion
 #pragma region Lexer
@@ -759,6 +855,10 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".else")
 							{
 								tokens.push_back(new Tokens::Keywords::Else); --i; return;
+							}
+							if(name == ".end")
+							{
+								tokens.push_back(new Tokens::Keywords::End); --i; return;
 							}
 							throw std::exception("unsupported keyword type");
 						})();
@@ -1005,17 +1105,17 @@ std::vector<LangE::uint8>										LangE::Compilers::ASM86::Push8(uint8 value)
 }
 #pragma endregion
 #pragma region Jump
-std::vector<LangE::uint8>											LangE::Compilers::ASM86::JZ32(uint32 value)
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JZ32(sint32 value)
 {
 	auto jmpSize = value;
 	return std::vector<uint8>{0x0F,0x84,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
 }
-std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(uint32 value)
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(sint32 value)
 {
 	auto jmpSize = value;
 	return std::vector<uint8>{0x0F,0x85,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
 }
-std::vector<LangE::uint8>											LangE::Compilers::ASM86::JMP32(uint32 value)
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::JMP32(sint32 value)
 {
 	auto jmpSize = value;
 	return std::vector<uint8>{0xE9,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};

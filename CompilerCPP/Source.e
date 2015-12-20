@@ -1,13 +1,11 @@
-.int8 a;
-
-.if a;
-positiveInstruction {
-	a;
-	.int8 ololo;
+{
+	.int8 a;
+	{
+		.int8 b;
+		.int8 c;
+		.end ;
+	}
+	.int8 d;
+	.end ;
 }
-.else negativeInstruction {
-	.int8 c;
-	.int8 d;	
-}
-
 

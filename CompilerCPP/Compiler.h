@@ -39,6 +39,10 @@ namespace LangE
 		}
 	}
 
+	/*struct Label
+	{
+	};*/
+
 	struct Lexer;
 	struct Parser;
 	struct Compiler;
@@ -228,7 +232,8 @@ namespace LangE
 			enum struct Type
 			{
 				None,
-				If, Else
+				If, Else,
+				Begin, End
 			};
 
 			virtual Token::Type GetTokenType() const override;
@@ -247,6 +252,17 @@ namespace LangE
 				public Keyword
 			{
 				virtual Keyword::Type GetKeywordType() const override;
+			};
+			struct Begin:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
+			};
+			struct End:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual Instruction* Parse(Parser* parser) override;
 			};
 		}
 	}
@@ -271,6 +287,7 @@ namespace LangE
 			public Instruction
 		{
 			std::string name;
+			uint32 stackOffset;
 
 			std::vector<Instruction*> instructions;
 			//std::map<std::string,DataType*> types;
@@ -310,7 +327,8 @@ namespace LangE
 			enum struct Type
 			{
 				None,
-				If
+				If,
+				End
 			};
 
 			virtual Instruction::Type GetInstructionType() const override;
@@ -326,6 +344,19 @@ namespace LangE
 				Instruction* negative;
 
 				If(Instructions::Variable* condition_,Instruction* positive_,Instruction* negative_);
+
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
+			};
+			struct End:
+				public Keyword
+			{
+				Block*const block;
+				uint32 stackOffset;
+				std::size_t beginJump;
+				std::size_t endJump;
+
+				End(Block* block_);
 
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual std::vector<uint8> Compile(Compiler* compiler) override;
@@ -376,9 +407,9 @@ namespace LangE
 		virtual std::vector<uint8> Push8(uint8 value) = 0;
 #pragma endregion
 #pragma region Jump
-		virtual std::vector<uint8> JZ32(uint32 value) = 0; // jump if zero main+int32
-		virtual std::vector<uint8> JNZ32(uint32 value) = 0; // jump if not zero main+int32
-		virtual std::vector<uint8> JMP32(uint32 value) = 0; // jump main+int32
+		virtual std::vector<uint8> JZ32(sint32 value) = 0; // jump if zero main+int32
+		virtual std::vector<uint8> JNZ32(sint32 value) = 0; // jump if not zero main+int32
+		virtual std::vector<uint8> JMP32(sint32 value) = 0; // jump main+int32
 #pragma endregion
 #pragma region Mov
 #pragma region ETX, 32
@@ -415,9 +446,9 @@ namespace LangE
 			virtual std::vector<uint8> Push8(uint8 value) override;
 #pragma endregion
 #pragma region Jump
-			virtual std::vector<uint8> JZ32(uint32 value) override;
-			virtual std::vector<uint8> JNZ32(uint32 value) override;
-			virtual std::vector<uint8> JMP32(uint32 value) override;
+			virtual std::vector<uint8> JZ32(sint32 value) override;
+			virtual std::vector<uint8> JNZ32(sint32 value) override;
+			virtual std::vector<uint8> JMP32(sint32 value) override;
 #pragma endregion
 #pragma region Mov
 #pragma region ETX, 32

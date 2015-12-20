@@ -9,30 +9,31 @@ glyph:
 	'', ""
 	marker:
 	~, !, @, #, $, %, ^, &, 8, -, +, *, /, \, |, <, >, =
+		There is some collision of <> block and <, > markers. Sheeeeiit.
 	special:
 	'.', ',', ';', ':',  
 
 blocks:
-Pair of {}, (), <>, [] brackets forming a block
-Block is an instruction, so you can use them for executing lot of code in the one condition
-(unreleased) Some blocks can effect variable scope
-Block can be named, placing the name before it start:
-	examples:
-		correct:
-			myBlock { ... }
-		incorrect:
-			myBlock; { ... }
+	Pair of {}, (), <>, [] brackets forming a block
+	Block is an instruction, so you can use them for executing lot of code in the one condition
+	After block ends, it's clean up every data, thats are created within
+	Block can be named, placing the name before it start:
+		examples:
+			correct:
+				myBlock { ... }
+			incorrect:
+				myBlock; { ... }
 
 indetifiers:
-Any uninterrupted sequence of digit/letter or marker are indetifier
-	examples:
-		correct:
-			a, a1, 1a, *, *=, =*, &^@
-		incorrect:
-			.a, *a, =a=, 1.a
+	Any uninterrupted sequence of digit/letter or marker are indetifier
+		examples:
+			correct:
+				a, a1, 1a, *, *=, =*, &^@
+			incorrect:
+				.a, *a, =a=, 1.a
 
 literals:
-Any sequence beginning with \', and ending with \' are literal
+	Any sequence beginning with \', and ending with \' are literal
 
 keywords:
 	[.if .else]
@@ -43,10 +44,15 @@ keywords:
 		.else %expression2%
 		execute %expression1% if %condition% are true, otherwise %expression2%
 
+	[.end]
+		.end;
+		Go to the end of current block. Use only within the blocks
+
 types:
-.int8 - signed 8-bit integer
+	.int8 - signed 8-bit integer
 
 current features aviable:
-{} blocks
-.if/.else keywords
-.int8 type
+	{} blocks
+	.if/.else keywords
+	.end keyword
+	.int8 type
