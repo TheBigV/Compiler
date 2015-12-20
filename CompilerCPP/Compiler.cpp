@@ -231,6 +231,34 @@ LangE::Token::Type											LangE::Tokens::Indetifier::GetTokenType() const
 }
 LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 {
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(pos + 1 < tokens.size() && tokens[pos + 1]->GetTokenType() == Token::Type::Block)
+	{
+		auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
+		if
+		(
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
+		)
+		{
+			auto instruction = tokens[++pos]->Parse(parser);
+			if(instruction && instruction->GetInstructionType() == Instruction::Type::Block)
+			{
+				auto block = (Instructions::Block*)instruction;
+				block->name = name;
+				return block;
+			}
+			else
+			{
+				throw std::exception("");
+			}
+		}
+	}
+
 	auto dataType = parser->SearchDataType(name);
 	if(dataType)
 	{
@@ -556,6 +584,11 @@ std::vector<LangE::uint8>										LangE::Instruction::Compile(Compiler* compile
 }
 #pragma endregion
 #pragma region Block
+LangE::Instructions::Block::Block(std::string name_):
+	name(name_)
+{
+
+}
 LangE::Instruction::Type										LangE::Instructions::Block::GetInstructionType() const
 {
 	return Instruction::Type::Block;

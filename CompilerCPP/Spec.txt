@@ -12,6 +12,17 @@ glyph:
 	special:
 	'.', ',', ';', ':',  
 
+blocks:
+Pair of {}, (), <>, [] brackets forming a block
+Block is an instruction, so you can use them for executing lot of code in the one condition
+(unreleased) Some blocks can effect variable scope
+Block can be named, placing the name before it start:
+	examples:
+		correct:
+			myBlock { ... }
+		incorrect:
+			myBlock; { ... }
+
 indetifiers:
 Any uninterrupted sequence of digit/letter or marker are indetifier
 	examples:
@@ -35,3 +46,7 @@ keywords:
 types:
 .int8 - signed 8-bit integer
 
+current features aviable:
+{} blocks
+.if/.else keywords
+.int8 type

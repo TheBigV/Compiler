@@ -270,9 +270,13 @@ namespace LangE
 		struct Block:
 			public Instruction
 		{
+			std::string name;
+
 			std::vector<Instruction*> instructions;
 			//std::map<std::string,DataType*> types;
 			std::map<std::string,Instructions::Variable*> variables;
+
+			Block(std::string name_ = "");
 
 			virtual Instruction::Type GetInstructionType() const override;
 			virtual std::vector<uint8> Compile(Compiler* compiler) override;
