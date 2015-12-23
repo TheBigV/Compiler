@@ -36,12 +36,10 @@ namespace LangE
 		namespace Keywords
 		{
 			struct If;
+			struct Begin;
+			struct End;
 		}
 	}
-
-	/*struct Label
-	{
-	};*/
 
 	struct Lexer;
 	struct Parser;
@@ -85,6 +83,7 @@ namespace LangE
 				Angled
 			};
 
+			std::string name;
 			Instructions::Block* block = nullptr;
 
 			virtual Token::Type GetTokenType() const override;
@@ -287,8 +286,17 @@ namespace LangE
 		struct Block:
 			public Instruction
 		{
+		private:
+			static void _RecursiveBlockOffset(LangE::Instruction* instruction,std::size_t offset);
+		public:
 			std::string name;
+
 			uint32 stackOffset;
+			uint32 begin;
+			uint32 end;
+
+			std::vector<Keywords::Begin*> jumpBegin;
+			std::vector<Keywords::End*> jumpEnd;
 
 			std::vector<Instruction*> instructions;
 			//std::map<std::string,DataType*> types;
@@ -353,8 +361,8 @@ namespace LangE
 				public Keyword
 			{
 				Block*const block;
-				std::size_t beginJump;
-				std::size_t endJump;
+				uint32 beginJump;
+				uint32 endJump;
 
 				Begin(Block* block_);
 
@@ -365,8 +373,8 @@ namespace LangE
 				public Keyword
 			{
 				Block*const block;
-				std::size_t beginJump;
-				std::size_t endJump;
+				uint32 beginJump;
+				uint32 endJump;
 
 				End(Block* block_);
 
@@ -397,6 +405,7 @@ namespace LangE
 		virtual void AddVariable(Instructions::Variable* variable);
 		virtual DataType* SearchDataType(const std::string& name);
 		virtual Instructions::Variable* SearchVariable(const std::string& name);
+		virtual Instructions::Block* SearchBlock(const std::string& name);
 	};
 	struct Compiler
 	{

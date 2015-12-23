@@ -24,6 +24,9 @@ blocks:
 			incorrect:
 				myBlock; { ... }
 	You can jump within a block, using .begin and .end keywords
+	You can jump through multiple blocks using block name after .begin or .end
+		examples:
+			myBlock1 { myBlock2 { .begin myBlock1; } }
 
 indetifiers:
 	Any uninterrupted sequence of digit/letter or marker are indetifier

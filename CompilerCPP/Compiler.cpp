@@ -99,7 +99,7 @@ LangE::Instructions::Variable*				LangE::Tokens::Blocks::Figureds::Begin::ParseV
 	}
 	else
 	{
-		block = new Instructions::Block;
+		block = new Instructions::Block(name);
 		parser->blocks.push_back(block);
 	}
 
@@ -245,11 +245,11 @@ LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 			(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
 		)
 		{
-			auto instruction = tokens[++pos]->Parse(parser);
+			++pos;
+			auto instruction = tokens[pos]->Parse(parser);
 			if(instruction && instruction->GetInstructionType() == Instruction::Type::Block)
 			{
 				auto block = (Instructions::Block*)instruction;
-				block->name = name;
 				return block;
 			}
 			else
@@ -394,22 +394,42 @@ LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 }
 LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(Parser* parser) 
 {
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(pos + 1 < tokens.size() && tokens[pos + 1]->GetTokenType() == Token::Type::Block)
+	{
+		auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
+		if
+			(
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
+			(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
+			)
+		{
+			tokenBlock->name = name;
+			auto variable = tokens[++pos]->ParseVariables(parser);
+			return variable;
+		}
+	}
+
 	auto dataType = parser->SearchDataType(name);
 	if(dataType)
 	{
-		++parser->pos;
-		if(parser->pos < parser->tokens->size())
+		++pos;
+		if(pos < tokens.size())
 		{
-			if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Indetifier)
+			if(tokens[pos]->GetTokenType() == Token::Type::Indetifier)
 			{
-				auto tokenVariable = (Tokens::Indetifier*)(*parser->tokens)[parser->pos];
-				++parser->pos;
-				if(parser->pos < parser->tokens->size())
+				auto tokenVariable = (Tokens::Indetifier*)tokens[pos];
+				++pos;
+				if(pos < tokens.size())
 				{
-					if((*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+					if(tokens[pos]->GetTokenType() == Token::Type::Semicolon)
 					{
-						auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
-						++parser->pos;
+						auto tokenSemicolon = (Tokens::Semicolon*)tokens[pos];
+						++pos;
 
 						auto variable = new Instructions::Variable(dataType, tokenVariable->name);
 
@@ -438,10 +458,10 @@ LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(
 	}
 	else
 	{
-		++parser->pos;
-		if(parser->pos < parser->tokens->size() && (*parser->tokens)[parser->pos]->GetTokenType() == Token::Type::Semicolon)
+		++pos;
+		if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
 		{
-			++parser->pos;
+			++pos;
 		}
 		return nullptr;
 	}
@@ -584,20 +604,47 @@ LangE::Instruction*												LangE::Tokens::Keywords::Begin::Parse(Parser* par
 	auto &pos = parser->pos;
 	auto tokens = *parser->tokens;
 
-	if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+	if(++pos < tokens.size())
 	{
-		++pos;
+		if(tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+		{
+			++pos;
 
-		if(!parser->blocks.empty())
-		{
-			auto block = parser->blocks.back();
-			auto keywordBegin = new Instructions::Keywords::Begin(block);
-			return keywordBegin;
+			if(!parser->blocks.empty())
+			{
+				auto block = parser->blocks.back();
+				auto keywordBegin = new Instructions::Keywords::Begin(block);
+				return keywordBegin;
+			}
+			else
+			{
+				throw std::exception("[.begin] can't find block");
+			}
 		}
-		else
+		if(tokens[pos]->GetTokenType() == Token::Type::Indetifier)
 		{
-			throw std::exception("[.begin] can't find block");
+			auto indetifier = (Tokens::Indetifier*)tokens[pos];
+
+			if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+			{
+				auto block = parser->SearchBlock(indetifier->name);
+				if(block)
+				{
+					++pos;
+					auto keywordBegin = new Instructions::Keywords::Begin(block);
+					return keywordBegin;
+				}
+				else
+				{
+					throw std::exception("[.begin] can't find block");
+				}
+			}
+			else
+			{
+				throw std::exception("[.begin] no semicolon ahead");
+			}
 		}
+		throw std::exception("[.begin] no semicolon ahead");
 	}
 	else
 	{
@@ -615,20 +662,47 @@ LangE::Instruction*												LangE::Tokens::Keywords::End::Parse(Parser* parse
 	auto &pos = parser->pos;
 	auto tokens = *parser->tokens;
 
-	if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+	if(++pos < tokens.size())
 	{
-		++pos;
+		if(tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+		{
+			++pos;
 
-		if(!parser->blocks.empty())
-		{
-			auto block = parser->blocks.back();
-			auto keywordEnd = new Instructions::Keywords::End(block);
-			return keywordEnd;
+			if(!parser->blocks.empty())
+			{
+				auto block = parser->blocks.back();
+				auto keywordEnd = new Instructions::Keywords::End(block);
+				return keywordEnd;
+			}
+			else
+			{
+				throw std::exception("[.end] can't find block");
+			}
 		}
-		else
+		if(tokens[pos]->GetTokenType() == Token::Type::Indetifier)
 		{
-			throw std::exception("[.end] can't find block");
+			auto indetifier = (Tokens::Indetifier*)tokens[pos];
+
+			if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+			{
+				auto block = parser->SearchBlock(indetifier->name);
+				if(block)
+				{
+					++pos;
+					auto keywordEnd = new Instructions::Keywords::End(block);
+					return keywordEnd;
+				}
+				else
+				{
+					throw std::exception("[.end] can't find block");
+				}
+			}
+			else
+			{
+				throw std::exception("[.end] no semicolon ahead");
+			}
 		}
+		throw std::exception("[.end] no semicolon ahead");
 	}
 	else
 	{
@@ -655,42 +729,44 @@ LangE::Instruction::Type										LangE::Instructions::Block::GetInstructionType
 {
 	return Instruction::Type::Block;
 }
+void LangE::Instructions::Block::_RecursiveBlockOffset(Instruction* instruction, std::size_t offset)
+{
+	if(instruction->GetInstructionType() == Instruction::Type::Block)
+	{
+		auto block = (Instructions::Block*)instruction;
+		for(auto i : block->instructions)
+		{
+			_RecursiveBlockOffset(i,offset);
+		}
+	}
+	if(instruction->GetInstructionType() == Instruction::Type::Keyword)
+	{
+		auto keyword = (Instructions::Keyword*)instruction;
+		if(keyword->GetKeywordType() == Instructions::Keyword::Type::Begin)
+		{
+			auto keywordBegin = (Instructions::Keywords::End*)keyword;
+			keywordBegin->beginJump += offset;
+			keywordBegin->endJump += offset;
+		}
+		if(keyword->GetKeywordType() == Instructions::Keyword::Type::End)
+		{
+			auto keywordEnd = (Instructions::Keywords::End*)keyword;
+			keywordEnd->beginJump += offset;
+			keywordEnd->endJump += offset;
+		}
+	}
+}
 std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler* compiler)
 {
 	std::vector<LangE::uint8> codes;
 
 	stackOffset = compiler->stackOffset;
 
-	std::vector<Keywords::Begin*> jumpBegin;
-	std::vector<Keywords::End*> jumpEnd;
-
 	for(auto instruction : instructions)
 	{
 		auto code = instruction->Compile(compiler);
 
-		if(instruction->GetInstructionType() == Instruction::Type::Keyword)
-		{
-			auto keyword = (Instructions::Keyword*)instruction;
-			[&]()
-			{
-				if(keyword->GetKeywordType() == Instructions::Keyword::Type::Begin)
-				{
-					auto keywordBegin = (Instructions::Keywords::Begin*)keyword;
-					keywordBegin->beginJump += codes.size();
-					keywordBegin->endJump += codes.size();
-					jumpBegin.push_back(keywordBegin);
-					return;
-				}
-				if(keyword->GetKeywordType() == Instructions::Keyword::Type::End)
-				{
-					auto keywordEnd = (Instructions::Keywords::End*)keyword;
-					keywordEnd->beginJump += codes.size();
-					keywordEnd->endJump += codes.size();
-					jumpEnd.push_back(keywordEnd);
-					return;
-				}
-			}();
-		}
+		_RecursiveBlockOffset(instruction, codes.size());
 
 		for(auto i : code) codes.push_back(i);
 	}
@@ -705,7 +781,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Block::Compile(Compiler*
 
 	for(auto i : jumpBegin)
 	{
-		auto jumpSize = -sint32(i->endJump);// -sint32(codes.size());
+		auto jumpSize = -sint32(i->endJump);
 		auto jumpCode = compiler->JMP32(jumpSize);
 
 		for(std::size_t j = 0; j < jumpCode.size(); ++j)
@@ -829,6 +905,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 LangE::Instructions::Keywords::Begin::Begin(Block* block_):
 	block(block_)
 {
+	block->jumpBegin.push_back(this);
 }
 LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::Begin::GetKeywordType() const
 {
@@ -858,6 +935,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::Begin::Compile
 LangE::Instructions::Keywords::End::End(Block* block_):
 	block(block_)
 {
+	block->jumpEnd.push_back(this);
 }
 LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::End::GetKeywordType() const
 {
@@ -1012,7 +1090,7 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 				{
 					auto oi = i;
 					++i;
-					while(i < source.size() && isLetter(source[i])) ++i;
+					while(i < source.size() && (isLetter(source[i]) || isDigit(source[i]))) ++i;
 
 					auto name = source.substr(oi,i - oi);
 					tokens.push_back(new Tokens::Indetifier(name));
@@ -1151,6 +1229,16 @@ LangE::Instructions::Variable*									LangE::Parser::SearchVariable(const std::
 	{
 		return nullptr;
 	}*/
+}
+LangE::Instructions::Block*										LangE::Parser::SearchBlock(const std::string& name)
+{
+	for(auto i = blocks.rbegin(); i != blocks.rend(); ++i)
+	{
+		auto block = *i;
+		if(block->name == name) return block;
+	}
+
+	return nullptr;
 }
 #pragma endregion
 #pragma region Compilers
