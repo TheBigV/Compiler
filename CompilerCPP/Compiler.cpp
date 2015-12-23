@@ -602,7 +602,7 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Begin::GetKeywordT
 LangE::Instruction*												LangE::Tokens::Keywords::Begin::Parse(Parser* parser)
 {
 	auto &pos = parser->pos;
-	auto tokens = *parser->tokens;
+	auto &tokens = *parser->tokens;
 
 	if(++pos < tokens.size())
 	{
@@ -660,7 +660,7 @@ LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::End::GetKeywordTyp
 LangE::Instruction*												LangE::Tokens::Keywords::End::Parse(Parser* parser)
 {
 	auto &pos = parser->pos;
-	auto tokens = *parser->tokens;
+	auto &tokens = *parser->tokens;
 
 	if(++pos < tokens.size())
 	{
@@ -707,6 +707,71 @@ LangE::Instruction*												LangE::Tokens::Keywords::End::Parse(Parser* parse
 	else
 	{
 		throw std::exception("[.end] no semicolon ahead");
+	}
+}
+#pragma endregion
+#pragma region While
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::While::GetKeywordType() const
+{
+	return Keyword::Type::While;
+}
+LangE::Instruction*												LangE::Tokens::Keywords::While::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(++pos < tokens.size())
+	{
+		auto condition = tokens[pos]->Parse(parser);
+		if(condition->GetInstructionType() == Instruction::Type::Variable)
+		{
+			auto variable = (Instructions::Variable*)condition;
+			if(pos < tokens.size())
+			{
+				auto instruction = tokens[pos]->Parse(parser);
+
+				auto keywordCycle = new Instructions::Keywords::Cycle(variable,instruction);
+				return keywordCycle;
+
+				// loop todo
+			}
+			else
+			{
+				throw std::exception("[.while] no instruction ahead");
+			}
+		}
+		else
+		{
+			throw std::exception("[.while] condition re not variable");
+		}
+	}
+	else
+	{
+		throw std::exception("[.while] no condition ahead");
+	}
+}
+LangE::Instructions::Variable*									LangE::Tokens::Keywords::While::ParseVariables(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(++pos < tokens.size())
+	{
+		auto condition = tokens[pos]->ParseVariables(parser);
+		if(pos < tokens.size())
+		{
+			auto instruction = tokens[pos]->ParseVariables(parser);
+			// loop todo
+		}
+		else
+		{
+			throw std::exception("[.while] no instruction ahead");
+		}
+		return nullptr;
+	}
+	else
+	{
+		throw std::exception("[.while] no condition ahead");
 	}
 }
 #pragma endregion
@@ -859,9 +924,7 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 
 	auto conditionByteRelativeLocation = compiler->stackOffset - condition->stackOffset;
 	auto conditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(conditionByteRelativeLocation));
-
-	auto convertionByteToWord = compiler->CBW();
-	auto convertionWordToDoubleWord = compiler->CWD();
+	auto comparsionCode = compiler->CMP_AL_0();
 
 	if(negative)
 	{
@@ -873,12 +936,11 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 		auto positiveJumpCode = compiler->JMP32(positiveJumpSize);	// jump to the end of .else
 
 		auto negativeJumpSize = positiveCode.size() + positiveJumpCode.size();
-		auto negativeJumpCode = compiler->JNZ32(negativeJumpSize); // jump to the .else
+		auto negativeJumpCode = compiler->JZ32(negativeJumpSize); // jump to the .else
 
 
 		for(auto i : conditionCode) code.push_back(i);
-		for(auto i : convertionByteToWord) code.push_back(i);
-		for(auto i : convertionWordToDoubleWord) code.push_back(i);
+		for(auto i : comparsionCode) code.push_back(i);
 		for(auto i : negativeJumpCode) code.push_back(i);
 		for(auto i : positiveCode) code.push_back(i);
 		for(auto i : positiveJumpCode) code.push_back(i);
@@ -889,11 +951,10 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::If::Compile(Co
 		auto positiveCode = positive->Compile(compiler);
 		auto negativeJumpSize = positiveCode.size();
 
-		auto negativeJumpCode = compiler->JNZ32(negativeJumpSize); // jump to the end of .if
+		auto negativeJumpCode = compiler->JZ32(negativeJumpSize); // jump to the end of .if
 
 		for(auto i : conditionCode) code.push_back(i);
-		for(auto i : convertionByteToWord) code.push_back(i);
-		for(auto i : convertionWordToDoubleWord) code.push_back(i);
+		for(auto i : comparsionCode) code.push_back(i);
 		for(auto i : negativeJumpCode) code.push_back(i);
 		for(auto i : positiveCode) code.push_back(i);
 	}
@@ -961,6 +1022,48 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::End::Compile(C
 	return code;
 }
 #pragma endregion
+#pragma region Cycle
+LangE::Instructions::Keywords::Cycle::Cycle(Variable* entryCondition_,Instruction* instruction_):
+	entryCondition(entryCondition_),
+	instruction(instruction_)
+{
+}
+LangE::Instructions::Keyword::Type			LangE::Instructions::Keywords::Cycle::GetKeywordType() const
+{
+	return Keyword::Type::Cycle;
+}
+std::vector<LangE::uint8>					LangE::Instructions::Keywords::Cycle::Compile(Compiler* compiler)
+{
+	auto code = std::vector<uint8>{};
+
+	if(entryCondition)
+	{
+		auto cycleJumpGagCode = compiler->JMP32(0);
+
+		auto entryConditionByteRelativeLocation = compiler->stackOffset - entryCondition->stackOffset;
+		auto entryConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(entryConditionByteRelativeLocation));
+		auto entryComparsionCode = compiler->CMP_AL_0();
+
+		auto instructionCode = instruction->Compile(compiler);
+		auto instructionSize = instructionCode.size();
+
+		auto entryJumpCode = compiler->JZ32(instructionSize + cycleJumpGagCode.size());
+
+		auto entrySize = entryConditionCode.size() + entryComparsionCode.size() + entryJumpCode.size();
+
+		auto cycleSize = entrySize + instructionSize + cycleJumpGagCode.size();
+		auto cycleJumpCode = compiler->JMP32(-cycleSize);
+
+		for(auto i : entryConditionCode) code.push_back(i);
+		for(auto i : entryComparsionCode) code.push_back(i);
+		for(auto i : entryJumpCode) code.push_back(i);
+		for(auto i : instructionCode) code.push_back(i);
+		for(auto i : cycleJumpCode) code.push_back(i);
+	}
+
+	return code;
+}
+#pragma endregion
 #pragma endregion
 #pragma endregion
 #pragma region Lexer
@@ -1015,6 +1118,10 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".end")
 							{
 								tokens.push_back(new Tokens::Keywords::End); --i; return;
+							}
+							if(name == ".while")
+							{
+								tokens.push_back(new Tokens::Keywords::While); --i; return;
 							}
 							throw std::exception("unsupported keyword type");
 						})();
@@ -1268,6 +1375,12 @@ std::vector<LangE::uint8>											LangE::Compilers::ASM86::CDQ()
 std::vector<LangE::uint8>										LangE::Compilers::ASM86::Push8(uint8 value)
 {
 	return std::vector<uint8>{0x6A, value};
+}
+#pragma endregion
+#pragma region Compare
+std::vector<LangE::uint8>											LangE::Compilers::ASM86::CMP_AL_0()
+{
+	return std::vector<uint8>{0x3C,0x00};
 }
 #pragma endregion
 #pragma region Jump

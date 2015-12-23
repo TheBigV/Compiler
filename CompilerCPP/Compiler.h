@@ -232,7 +232,8 @@ namespace LangE
 			{
 				None,
 				If, Else,
-				Begin, End
+				Begin, End,
+				While
 			};
 
 			virtual Token::Type GetTokenType() const override;
@@ -263,6 +264,13 @@ namespace LangE
 			{
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual Instruction* Parse(Parser* parser) override;
+			};
+			struct While:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual Instruction* Parse(Parser* parser) override;
+				virtual Instructions::Variable* ParseVariables(Parser* parser) override;
 			};
 		}
 	}
@@ -337,7 +345,8 @@ namespace LangE
 			{
 				None,
 				If,
-				Begin, End
+				Begin, End,
+				Cycle
 			};
 
 			virtual Instruction::Type GetInstructionType() const override;
@@ -377,6 +386,18 @@ namespace LangE
 				uint32 endJump;
 
 				End(Block* block_);
+
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
+			};
+			struct Cycle:
+				public Keyword
+			{
+				Variable* entryCondition;
+				//Variable* leaveCondition;
+				Instruction* instruction;
+
+				Cycle(Variable* entryCondition_,Instruction* instruction_);
 
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual std::vector<uint8> Compile(Compiler* compiler) override;
@@ -427,6 +448,9 @@ namespace LangE
 #pragma region Push/Pop
 		virtual std::vector<uint8> Push8(uint8 value) = 0;
 #pragma endregion
+#pragma region Compare
+		virtual std::vector<uint8> CMP_AL_0() = 0; // jump if zero main+int32
+#pragma endregion
 #pragma region Jump
 		virtual std::vector<uint8> JZ32(sint32 value) = 0; // jump if zero main+int32
 		virtual std::vector<uint8> JNZ32(sint32 value) = 0; // jump if not zero main+int32
@@ -465,6 +489,9 @@ namespace LangE
 #pragma endregion
 #pragma region Push/Pop
 			virtual std::vector<uint8> Push8(uint8 value) override;
+#pragma endregion
+#pragma region Compare
+			virtual std::vector<uint8> CMP_AL_0() override;
 #pragma endregion
 #pragma region Jump
 			virtual std::vector<uint8> JZ32(sint32 value) override;

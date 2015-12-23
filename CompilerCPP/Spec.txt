@@ -42,17 +42,21 @@ literals:
 keywords:
 	[.if .else]
 		.if %condition%; %expression%
-		execute %expression% if %condition% are true
+		Execute %expression% if %condition% are true
 	
 		.if %condition%; %expression1%
 		.else %expression2%
-		execute %expression1% if %condition% are true, otherwise %expression2%
+		Execute %expression1% if %condition% are true, otherwise %expression2%
 
 	[.begin .end]
 		.begin;
 		Go to the begin of the current block. Use only within the blocks
 		.end;
 		Go to the end of the current block. Use only within the blocks
+
+	[.while]
+		.while %condition%; %expression%
+		Check the %condition% and: execute an %expression% and return to the cycle beginning on true, or jump to the end of %expression% on false.
 
 types:
 	.int8 - signed 8-bit integer
