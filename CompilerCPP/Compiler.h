@@ -233,7 +233,7 @@ namespace LangE
 				None,
 				If, Else,
 				Begin, End,
-				While
+				While, Loop
 			};
 
 			virtual Token::Type GetTokenType() const override;
@@ -271,6 +271,14 @@ namespace LangE
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual Instruction* Parse(Parser* parser) override;
 				virtual Instructions::Variable* ParseVariables(Parser* parser) override;
+			};
+			struct Loop:
+				public Keyword
+			{
+				static Instructions::Variable* TryParse(Parser* parser);
+				static Instruction* Parse(Parser* parser,Instruction* inputInstruction);
+
+				virtual Keyword::Type GetKeywordType() const override;
 			};
 		}
 	}
@@ -394,10 +402,10 @@ namespace LangE
 				public Keyword
 			{
 				Variable* entryCondition;
-				//Variable* leaveCondition;
+				Variable* leaveCondition;
 				Instruction* instruction;
 
-				Cycle(Variable* entryCondition_,Instruction* instruction_);
+				Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_);
 
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual std::vector<uint8> Compile(Compiler* compiler) override;

@@ -1,6 +1,3 @@
 .int8 a;
-.while a;
-{
-	a;
-}
-
+.int8 b;
+a; .loop a; .loop b;

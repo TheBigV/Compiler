@@ -54,9 +54,11 @@ keywords:
 		.end;
 		Go to the end of the current block. Use only within the blocks
 
-	[.while]
+	[.while .loop]
 		.while %condition%; %expression%
 		Check the %condition% and: execute an %expression% and return to the cycle beginning on true, or jump to the end of %expression% on false.
+		%expression% .loop %condition%;
+		After executing %expression% check the %condition% and return to the cycle beginning on true
 
 types:
 	.int8 - signed 8-bit integer
@@ -64,5 +66,6 @@ types:
 current features aviable:
 	{} blocks
 	.if/.else keywords
-	.begin/.end keywords
+	.begin/.end keywords (block jump)
+	.while/.loop keywords (cycles)
 	.int8 type

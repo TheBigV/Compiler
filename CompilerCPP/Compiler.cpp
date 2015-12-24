@@ -78,6 +78,7 @@ LangE::Instruction*							LangE::Tokens::Blocks::Figureds::Begin::Parse(Parser* 
 			}
 
 			auto instruction = token->Parse(parser);
+			instruction = Tokens::Keywords::Loop::Parse(parser,instruction);
 			block->instructions.push_back(instruction);
 		}
 	}
@@ -374,6 +375,16 @@ LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 					auto tokenSemicolon = (Tokens::Semicolon*)(*parser->tokens)[parser->pos];
 					++parser->pos;
 
+					/*auto leaveCondition = Tokens::Keywords::Loop::TryParse(parser);
+					if(leaveCondition)
+					{
+						auto instructionCycle = new Instructions::Keywords::Cycle(nullptr,leaveCondition,variable);
+						return instructionCycle;
+					}
+					else
+					{
+						return variable;
+					}*/
 					return variable;
 				}
 				else
@@ -725,12 +736,12 @@ LangE::Instruction*												LangE::Tokens::Keywords::While::Parse(Parser* par
 		auto condition = tokens[pos]->Parse(parser);
 		if(condition->GetInstructionType() == Instruction::Type::Variable)
 		{
-			auto variable = (Instructions::Variable*)condition;
+			auto entryCondition = (Instructions::Variable*)condition;
 			if(pos < tokens.size())
 			{
 				auto instruction = tokens[pos]->Parse(parser);
 
-				auto keywordCycle = new Instructions::Keywords::Cycle(variable,instruction);
+				auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,nullptr,instruction);
 				return keywordCycle;
 
 				// loop todo
@@ -773,6 +784,89 @@ LangE::Instructions::Variable*									LangE::Tokens::Keywords::While::ParseVari
 	{
 		throw std::exception("[.while] no condition ahead");
 	}
+}
+#pragma endregion
+#pragma region Loop
+LangE::Instructions::Variable*									LangE::Tokens::Keywords::Loop::TryParse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+	{
+		auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
+		if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+		{			
+			if(++pos < tokens.size())
+			{
+				auto instruction = tokens[pos]->Parse(parser);
+				if(instruction->GetInstructionType() == Instruction::Type::Variable)
+				{
+					auto leaveCondition = (Instructions::Variable*)instruction;
+					return leaveCondition;
+				}
+				else
+				{
+					throw std::exception("[.loop] leave condition are not variable");
+				}
+			}
+			else
+			{
+				throw std::exception("[.loop] no leave condition ahead");
+			}
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+	else
+	{
+		return nullptr;
+	}
+}
+LangE::Instruction*												LangE::Tokens::Keywords::Loop::Parse(Parser* parser,Instruction* inputInstruction)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+	{
+		auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
+		if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+		{
+			if(++pos < tokens.size())
+			{
+				auto instruction = tokens[pos]->Parse(parser);
+				if(instruction->GetInstructionType() == Instruction::Type::Variable)
+				{
+					auto leaveCondition = (Instructions::Variable*)instruction;
+					auto cycle = new Instructions::Keywords::Cycle(nullptr,leaveCondition,inputInstruction);
+					return Parse(parser,cycle);
+				}
+				else
+				{
+					throw std::exception("[.loop] leave condition are not variable");
+				}
+			}
+			else
+			{
+				throw std::exception("[.loop] no leave condition ahead");
+			}
+		}
+		else
+		{
+			return inputInstruction;
+		}
+	}
+	else
+	{
+		return inputInstruction;
+	}
+}
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Loop::GetKeywordType() const
+{
+	return Keyword::Type::Loop;
 }
 #pragma endregion
 #pragma endregion
@@ -874,7 +968,7 @@ LangE::Instructions::Variable::Variable(DataType* type_,std::string name_):
 	name(name_)
 {
 }
-LangE::Instruction::Type									LangE::Instructions::Variable::GetInstructionType() const
+LangE::Instruction::Type										LangE::Instructions::Variable::GetInstructionType() const
 {
 	return Type::Variable;
 }
@@ -1023,8 +1117,9 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::End::Compile(C
 }
 #pragma endregion
 #pragma region Cycle
-LangE::Instructions::Keywords::Cycle::Cycle(Variable* entryCondition_,Instruction* instruction_):
+LangE::Instructions::Keywords::Cycle::Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_):
 	entryCondition(entryCondition_),
+	leaveCondition(leaveCondition_),
 	instruction(instruction_)
 {
 }
@@ -1038,27 +1133,60 @@ std::vector<LangE::uint8>					LangE::Instructions::Keywords::Cycle::Compile(Comp
 
 	if(entryCondition)
 	{
-		auto cycleJumpGagCode = compiler->JMP32(0);
+		if(leaveCondition)
+		{
+			// todo
+		}
+		else
+		{
+			auto cycleJumpGagCode = compiler->JMP32(0);
 
-		auto entryConditionByteRelativeLocation = compiler->stackOffset - entryCondition->stackOffset;
-		auto entryConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(entryConditionByteRelativeLocation));
-		auto entryComparsionCode = compiler->CMP_AL_0();
+			auto entryConditionByteRelativeLocation = compiler->stackOffset - entryCondition->stackOffset;
+			auto entryConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(entryConditionByteRelativeLocation));
+			auto entryComparsionCode = compiler->CMP_AL_0();
 
-		auto instructionCode = instruction->Compile(compiler);
-		auto instructionSize = instructionCode.size();
+			auto instructionCode = instruction->Compile(compiler);
+			auto instructionSize = instructionCode.size();
 
-		auto entryJumpCode = compiler->JZ32(instructionSize + cycleJumpGagCode.size());
+			auto entryJumpCode = compiler->JZ32(instructionSize + cycleJumpGagCode.size());
 
-		auto entrySize = entryConditionCode.size() + entryComparsionCode.size() + entryJumpCode.size();
+			auto entrySize = entryConditionCode.size() + entryComparsionCode.size() + entryJumpCode.size();
 
-		auto cycleSize = entrySize + instructionSize + cycleJumpGagCode.size();
-		auto cycleJumpCode = compiler->JMP32(-cycleSize);
+			auto cycleSize = entrySize + instructionSize + cycleJumpGagCode.size();
+			auto cycleJumpCode = compiler->JMP32(-(sint32)cycleSize);
 
-		for(auto i : entryConditionCode) code.push_back(i);
-		for(auto i : entryComparsionCode) code.push_back(i);
-		for(auto i : entryJumpCode) code.push_back(i);
-		for(auto i : instructionCode) code.push_back(i);
-		for(auto i : cycleJumpCode) code.push_back(i);
+			for(auto i : entryConditionCode) code.push_back(i);
+			for(auto i : entryComparsionCode) code.push_back(i);
+			for(auto i : entryJumpCode) code.push_back(i);
+			for(auto i : instructionCode) code.push_back(i);
+			for(auto i : cycleJumpCode) code.push_back(i);
+		}
+	}
+	else
+	{
+		if(leaveCondition)
+		{
+			auto instructionCode = instruction->Compile(compiler);
+
+			auto leaveConditionByteRelativeLocation = compiler->stackOffset - leaveCondition->stackOffset;
+			auto leaveConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(leaveConditionByteRelativeLocation));
+			auto leaveComparsionCode = compiler->CMP_AL_0();
+
+			auto leaveJumpGagCode = compiler->JNZ32(0);
+
+			auto cycleSize = instructionCode.size() + leaveConditionCode.size() + leaveComparsionCode.size() + leaveJumpGagCode.size();
+
+			auto leaveJumpCode = compiler->JNZ32(-(sint32)cycleSize);
+
+			for(auto i : instructionCode) code.push_back(i);
+			for(auto i : leaveConditionCode) code.push_back(i);
+			for(auto i : leaveComparsionCode) code.push_back(i);
+			for(auto i : leaveJumpCode) code.push_back(i);
+		}
+		else
+		{
+			throw std::exception("sheeeit");
+		}
 	}
 
 	return code;
@@ -1099,7 +1227,7 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 
 						([&]()
 						{
-							if(name == ".int8")
+							if([&name](){ for(auto i : Parser::basicTypes) if(i->name == name ) return true; return false; }())
 							{
 								tokens.push_back(new Tokens::Indetifier(name)); --i; return;
 							}
@@ -1122,6 +1250,10 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".while")
 							{
 								tokens.push_back(new Tokens::Keywords::While); --i; return;
+							}
+							if(name == ".loop")
+							{
+								tokens.push_back(new Tokens::Keywords::Loop); --i; return;
 							}
 							throw std::exception("unsupported keyword type");
 						})();
@@ -1216,7 +1348,18 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 #pragma endregion
 #pragma region Parser
 std::list<LangE::DataType*> LangE::Parser::basicTypes = {
-	new LangE::DataType(".int8",1)
+	new LangE::DataType(".int8",1),
+	new LangE::DataType(".int16",2),
+	new LangE::DataType(".int32",4),
+	new LangE::DataType(".int64",8),
+	new LangE::DataType(".sint8",1),
+	new LangE::DataType(".sint16",2),
+	new LangE::DataType(".sint32",4),
+	new LangE::DataType(".sint64",8),
+	new LangE::DataType(".uint8",1),
+	new LangE::DataType(".uint16",2),
+	new LangE::DataType(".uint32",4),
+	new LangE::DataType(".uint64",8)
 };
 LangE::Parser::Parser()
 {
@@ -1257,6 +1400,7 @@ std::vector<LangE::Instruction*>								LangE::Parser::Process(std::vector<Token
 	{
 		auto token = (*tokens)[pos];
 		auto instruction = token->Parse(this);
+		instruction = Tokens::Keywords::Loop::Parse(this,instruction);
 		if(instruction) instructions.push_back(instruction);
 	}
 
@@ -1392,7 +1536,7 @@ std::vector<LangE::uint8>											LangE::Compilers::ASM86::JZ32(sint32 value)
 std::vector<LangE::uint8>											LangE::Compilers::ASM86::JNZ32(sint32 value)
 {
 	auto jmpSize = value;
-	return std::vector<uint8>{0x0F,0x85,(uint8)(jmpSize << 0),(uint8)(jmpSize << 8),(uint8)(jmpSize << 16),(uint8)(jmpSize << 24)};
+	return std::vector<uint8>{0x0F,0x85,(uint8)(jmpSize >> 0),(uint8)(jmpSize >> 8),(uint8)(jmpSize >> 16),(uint8)(jmpSize >> 24)};
 }
 std::vector<LangE::uint8>											LangE::Compilers::ASM86::JMP32(sint32 value)
 {
