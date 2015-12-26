@@ -57,8 +57,12 @@ keywords:
 	[.while .loop]
 		.while %condition%; %expression%
 		Check the %condition% and: execute an %expression% and return to the cycle beginning on true, or jump to the end of %expression% on false.
+
 		%expression% .loop %condition%;
 		After executing %expression% check the %condition% and return to the cycle beginning on true
+
+		.while %entryCondition%; %expression% .loop %leaveCondition%;
+		If %entryCondition% return false - exit from cycle, otherwise execure %expression%. If %leaveCondition% return false - exit from cycle, otherwise jump to the beginning of cycle
 
 types:
 	.int8 - signed 8-bit integer
