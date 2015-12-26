@@ -733,18 +733,43 @@ LangE::Instruction*												LangE::Tokens::Keywords::While::Parse(Parser* par
 
 	if(++pos < tokens.size())
 	{
-		auto condition = tokens[pos]->Parse(parser);
-		if(condition->GetInstructionType() == Instruction::Type::Variable)
+		auto entryTestCondition = tokens[pos]->Parse(parser);
+		if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
 		{
-			auto entryCondition = (Instructions::Variable*)condition;
+			auto entryCondition = (Instructions::Variable*)entryTestCondition;
 			if(pos < tokens.size())
 			{
 				auto instruction = tokens[pos]->Parse(parser);
 
+				if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+				{
+					auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
+					if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+					{
+						if(++pos < tokens.size())
+						{
+							auto leaveTestCondition = tokens[pos]->Parse(parser);
+							if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
+							{
+								auto leaveCondition = (Instructions::Variable*)leaveTestCondition;
+
+								auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,leaveCondition,instruction);
+								return keywordCycle;
+							}
+							else
+							{
+								throw std::exception("[.loop] leave condition are not variable");
+							}
+						}
+						else
+						{
+							throw std::exception("[.loop] no instruction ahead");
+						}
+					}
+				}
+
 				auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,nullptr,instruction);
 				return keywordCycle;
-
-				// loop todo
 			}
 			else
 			{
@@ -753,7 +778,7 @@ LangE::Instruction*												LangE::Tokens::Keywords::While::Parse(Parser* par
 		}
 		else
 		{
-			throw std::exception("[.while] condition re not variable");
+			throw std::exception("[.while] entry condition are not variable");
 		}
 	}
 	else
@@ -1135,7 +1160,36 @@ std::vector<LangE::uint8>					LangE::Instructions::Keywords::Cycle::Compile(Comp
 	{
 		if(leaveCondition)
 		{
-			// todo
+			auto cycleJumpIdleCode = compiler->JMP32(0);
+
+			auto instructionCode = instruction->Compile(compiler);
+			auto instructionSize = instructionCode.size();
+
+			auto entryConditionByteRelativeLocation = compiler->stackOffset - entryCondition->stackOffset;
+			auto entryConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(entryConditionByteRelativeLocation));
+			auto entryComparsionCode = compiler->CMP_AL_0();
+			auto entryJumpIdleCode = compiler->JZ32(0);
+			auto entrySize = entryConditionCode.size() + entryComparsionCode.size() + entryJumpIdleCode.size();
+
+			auto leaveConditionByteRelativeLocation = compiler->stackOffset - leaveCondition->stackOffset;
+			auto leaveConditionCode = compiler->Mov_AL_LOC_ESPplus32(Compiler::Inverse(leaveConditionByteRelativeLocation));
+			auto leaveComparsionCode = compiler->CMP_AL_0();
+			auto leaveJumpIdleCode = compiler->JZ32(0);
+			auto leaveSize = leaveConditionCode.size() + leaveComparsionCode.size() + leaveJumpIdleCode.size();
+
+			auto entryJumpCode = compiler->JZ32(instructionSize + leaveSize + cycleJumpIdleCode.size());
+			auto leaveJumpCode = compiler->JZ32(cycleJumpIdleCode.size());
+
+			auto cycleJumpCode = compiler->JMP32(-(sint32)(entrySize + instructionSize + leaveSize + cycleJumpIdleCode.size()));
+
+			for(auto i : entryConditionCode) code.push_back(i);
+			for(auto i : entryComparsionCode) code.push_back(i);
+			for(auto i : entryJumpCode) code.push_back(i);
+			for(auto i : instructionCode) code.push_back(i);
+			for(auto i : leaveConditionCode) code.push_back(i);
+			for(auto i : leaveComparsionCode) code.push_back(i);
+			for(auto i : leaveJumpCode) code.push_back(i);
+			for(auto i : cycleJumpCode) code.push_back(i);
 		}
 		else
 		{
