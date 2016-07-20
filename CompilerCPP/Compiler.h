@@ -22,8 +22,50 @@ namespace LangE
 	struct Token;
 	namespace Tokens
 	{
+		struct Block;
+		namespace Blocks
+		{
+			struct Figured;
+			namespace Figureds
+			{
+				struct Begin;
+				struct End;
+			}
+			struct Round;
+			namespace Rounds
+			{
+				struct Begin;
+				struct End;
+			}
+			struct Squared;
+			namespace Squareds
+			{
+				struct Begin;
+				struct End;
+			}
+			struct Angled;
+			namespace Angleds
+			{
+				struct Begin;
+				struct End;
+			}
+		}
 		struct Semicolon;
+		struct Literal;
 		struct Indetifier;
+		struct Keyword;
+		namespace Keywords
+		{
+			struct If;
+			struct Else;
+			struct Begin;
+			struct End;
+			struct Cycle;
+			struct While;
+			struct Loop;
+			struct Repeat;
+			struct Break;
+		}
 	}
 
 	struct Instruction;
@@ -38,8 +80,11 @@ namespace LangE
 			struct If;
 			struct Begin;
 			struct End;
+			struct Cycle;
+			struct Repeat;
+			struct Break;
 		}
-	}
+	};
 
 	struct Lexer;
 	struct Parser;
@@ -66,6 +111,7 @@ namespace LangE
 		};
 
 		virtual Token::Type GetTokenType() const = 0;
+		virtual uint32 GetTokenSize(Parser* parser, uint32 pos) const;
 		virtual Instruction* Parse(Parser* parser);
 		virtual Instructions::Variable* ParseVariables(Parser* parser);
 	};
@@ -109,6 +155,7 @@ namespace LangE
 				struct Begin:
 					public Figured
 				{
+					virtual uint32 GetTokenSize(Parser* parser, uint32 pos) const override;
 					virtual Figured::Type GetFiguredType() const override;
 					virtual Instruction* Parse(Parser* parser) override;
 					virtual Instructions::Variable* ParseVariables(Parser* parser) override;
@@ -233,7 +280,7 @@ namespace LangE
 				None,
 				If, Else,
 				Begin, End,
-				While, Loop
+				While, Loop, Repeat, Break
 			};
 
 			virtual Token::Type GetTokenType() const override;
@@ -265,20 +312,38 @@ namespace LangE
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual Instruction* Parse(Parser* parser) override;
 			};
-			struct While:
+			struct Cycle:
 				public Keyword
+			{
+				std::string name;
+				Instructions::Keywords::Cycle* cycle = nullptr;
+			};
+			struct While:
+				public Cycle
 			{
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual Instruction* Parse(Parser* parser) override;
 				virtual Instructions::Variable* ParseVariables(Parser* parser) override;
 			};
 			struct Loop:
-				public Keyword
+				public Cycle
 			{
 				static Instructions::Variable* TryParse(Parser* parser);
 				static Instruction* Parse(Parser* parser,Instruction* inputInstruction);
 
 				virtual Keyword::Type GetKeywordType() const override;
+			};
+			struct Repeat:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual Instruction* Parse(Parser* parser) override;
+			};
+			struct Break:
+				public Keyword
+			{
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual Instruction* Parse(Parser* parser) override;
 			};
 		}
 	}
@@ -305,7 +370,7 @@ namespace LangE
 		private:
 			static void _RecursiveBlockOffset(LangE::Instruction* instruction,std::size_t offset);
 		public:
-			std::string name;
+			const std::string name;
 
 			uint32 stackOffset;
 			uint32 begin;
@@ -354,7 +419,7 @@ namespace LangE
 				None,
 				If,
 				Begin, End,
-				Cycle
+				Cycle, Repeat, Break
 			};
 
 			virtual Instruction::Type GetInstructionType() const override;
@@ -401,11 +466,44 @@ namespace LangE
 			struct Cycle:
 				public Keyword
 			{
+				const std::string name;
+
+				uint32 stackOffset;
+				uint32 begin;
+				uint32 end;
+
 				Variable* entryCondition;
 				Variable* leaveCondition;
 				Instruction* instruction;
 
-				Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_);
+				std::vector<Keywords::Repeat*> jumpBegin;
+				std::vector<Keywords::Break*> jumpEnd;
+
+				Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_, const std::string& name_ = "");
+
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
+			};
+			struct Repeat:
+				public Keyword
+			{
+				Instructions::Keywords::Cycle*const cycle;
+				uint32 beginJump;
+				uint32 endJump;
+
+				Repeat(Instructions::Keywords::Cycle* cycle_);
+
+				virtual Keyword::Type GetKeywordType() const override;
+				virtual std::vector<uint8> Compile(Compiler* compiler) override;
+			};
+			struct Break:
+				public Keyword
+			{
+				Instructions::Keywords::Cycle*const cycle;
+				uint32 beginJump;
+				uint32 endJump;
+
+				Break(Instructions::Keywords::Cycle* cycle_);
 
 				virtual Keyword::Type GetKeywordType() const override;
 				virtual std::vector<uint8> Compile(Compiler* compiler) override;
@@ -427,6 +525,7 @@ namespace LangE
 		std::map<std::string,DataType*> types;
 		std::map<std::string,Instructions::Variable*> variables;
 		std::vector<Instructions::Block*> blocks;
+		std::vector<Instructions::Keywords::Cycle*> cycles;
 
 		Parser();
 
@@ -435,6 +534,7 @@ namespace LangE
 		virtual DataType* SearchDataType(const std::string& name);
 		virtual Instructions::Variable* SearchVariable(const std::string& name);
 		virtual Instructions::Block* SearchBlock(const std::string& name);
+		virtual Instructions::Keywords::Cycle* SearchCycle(const std::string& name);
 	};
 	struct Compiler
 	{
@@ -527,6 +627,7 @@ namespace LangE
 	static bool isDigit(char c);
 	static bool isLetter(char c);
 	static bool isWhiteSpace(char c);
+	static bool isSemicolon(char c);
 
 	std::vector<uint8> Compile(const std::string& source);
 };

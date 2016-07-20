@@ -11,11 +11,15 @@ LangE::DataType::DataType(const std::string& name_, uint32 size_):
 #pragma endregion
 #pragma region Tokens
 #pragma region Token
-LangE::Instruction*											LangE::Token::Parse(Parser* parser)
+LangE::uint32													LangE::Token::GetTokenSize(Parser* parser, uint32 pos) const
+{
+	throw std::exception("Can't calculate token size");
+}
+LangE::Instruction*												LangE::Token::Parse(Parser* parser)
 {
 	throw std::exception("");
 }
-LangE::Instructions::Variable*								LangE::Token::ParseVariables(Parser* parser)
+LangE::Instructions::Variable*									LangE::Token::ParseVariables(Parser* parser)
 {
 	++parser->pos;
 	return nullptr;
@@ -36,11 +40,49 @@ LangE::Tokens::Block::Type					LangE::Tokens::Blocks::Figured::GetBlockType() co
 #pragma endregion
 #pragma region Figureds
 #pragma region Begin
-LangE::Tokens::Blocks::Figured::Type		LangE::Tokens::Blocks::Figureds::Begin::GetFiguredType() const
+LangE::uint32													LangE::Tokens::Blocks::Figureds::Begin::GetTokenSize(Parser* parser, uint32 pos) const
+{
+	auto &tokens = parser->tokens;
+
+	uint32 size = 1;
+
+	while(pos + size < tokens->size())
+	{
+		auto &token = (*tokens)[pos];
+
+		if(token->GetTokenType() == Token::Type::Block)
+		{
+			auto tokenBlock = (Tokens::Block*)(*tokens)[pos];
+			if(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured)
+			{
+				auto tokenBlockFigured = (Tokens::Blocks::Figured*)tokenBlock;
+				if(tokenBlockFigured->GetFiguredType() == Tokens::Blocks::Figured::Type::End)
+				{
+					++pos;
+					if(parser->blocks.size() > 0 && parser->blocks.back() == block)
+					{
+						parser->blocks.pop_back();
+						return block;
+					}
+					else
+					{
+						throw std::exception("");
+					}
+				}
+			}
+		}
+
+		auto instruction = token->Parse(parser);
+		instruction = Tokens::Keywords::Loop::Parse(parser, instruction);
+		block->instructions.push_back(instruction);
+	}
+
+}
+LangE::Tokens::Blocks::Figured::Type							LangE::Tokens::Blocks::Figureds::Begin::GetFiguredType() const
 {
 	return Figured::Type::Begin;
 }
-LangE::Instruction*							LangE::Tokens::Blocks::Figureds::Begin::Parse(Parser* parser)
+LangE::Instruction*												LangE::Tokens::Blocks::Figureds::Begin::Parse(Parser* parser)
 {
 	auto &pos = parser->pos;
 	auto &tokens = parser->tokens;
@@ -89,7 +131,7 @@ LangE::Instruction*							LangE::Tokens::Blocks::Figureds::Begin::Parse(Parser* 
 
 	throw std::exception("");
 }
-LangE::Instructions::Variable*				LangE::Tokens::Blocks::Figureds::Begin::ParseVariables(Parser* parser)
+LangE::Instructions::Variable*									LangE::Tokens::Blocks::Figureds::Begin::ParseVariables(Parser* parser)
 {
 	auto &pos = parser->pos;
 	auto &tokens = parser->tokens;
@@ -235,29 +277,48 @@ LangE::Instruction*											LangE::Tokens::Indetifier::Parse(Parser* parser)
 	auto &pos = parser->pos;
 	auto &tokens = *parser->tokens;
 
-	if(pos + 1 < tokens.size() && tokens[pos + 1]->GetTokenType() == Token::Type::Block)
+	if(pos + 1 < tokens.size())
 	{
-		auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
-		if
-		(
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
-		)
+		auto variable = [&]() -> Instruction*
 		{
-			++pos;
-			auto instruction = tokens[pos]->Parse(parser);
-			if(instruction && instruction->GetInstructionType() == Instruction::Type::Block)
+			if(tokens[pos + 1]->GetTokenType() == Token::Type::Block)
 			{
-				auto block = (Instructions::Block*)instruction;
-				return block;
+				auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
+				if
+					(
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
+					)
+				{
+					++pos;
+					auto instruction = tokens[pos]->Parse(parser);
+					if(instruction && instruction->GetInstructionType() == Instruction::Type::Block)
+					{
+						auto block = (Instructions::Block*)instruction;
+						return block;
+					}
+					else
+					{
+						throw std::exception("");
+					}
+				}
 			}
-			else
+			if(tokens[pos + 1]->GetTokenType() == Token::Type::Keyword)
 			{
-				throw std::exception("");
+				auto tokenKeyword = (Tokens::Keyword*)tokens[pos + 1];
+				if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::While || tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+				{
+					auto tokenCycle = (Tokens::Keywords::Cycle*)tokens[pos + 1];
+					tokenCycle->name = name;
+					auto instruction = tokens[++pos]->Parse(parser);
+					return tokenCycle->cycle;	// instruction;
+				}
 			}
-		}
+			return nullptr;
+		}();
+		if(variable) return variable;
 	}
 
 	auto dataType = parser->SearchDataType(name);
@@ -408,21 +469,40 @@ LangE::Instructions::Variable*								LangE::Tokens::Indetifier::ParseVariables(
 	auto &pos = parser->pos;
 	auto &tokens = *parser->tokens;
 
-	if(pos + 1 < tokens.size() && tokens[pos + 1]->GetTokenType() == Token::Type::Block)
+	if(pos + 1 < tokens.size())
 	{
-		auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
-		if
-			(
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
-			(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
-			)
+		auto variable = [&]() -> Instructions::Variable*
 		{
-			tokenBlock->name = name;
-			auto variable = tokens[++pos]->ParseVariables(parser);
-			return variable;
-		}
+			if(tokens[pos + 1]->GetTokenType() == Token::Type::Block)
+			{
+				auto tokenBlock = (Tokens::Block*)tokens[pos + 1];
+				if
+					(
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Figured && ((Tokens::Blocks::Figured*)tokenBlock)->GetFiguredType() == Tokens::Blocks::Figured::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Round && ((Tokens::Blocks::Round*)tokenBlock)->GetRoundType() == Tokens::Blocks::Round::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Squared && ((Tokens::Blocks::Squared*)tokenBlock)->GetSquaredType() == Tokens::Blocks::Squared::Type::Begin) ||
+					(tokenBlock->GetBlockType() == Tokens::Block::Type::Angled && ((Tokens::Blocks::Angled*)tokenBlock)->GetAngledType() == Tokens::Blocks::Angled::Type::Begin)
+					)
+				{
+					tokenBlock->name = name;
+					auto variable = tokens[++pos]->ParseVariables(parser);
+					return variable;
+				}
+			}
+			if(tokens[pos + 1]->GetTokenType() == Token::Type::Keyword)
+			{
+				auto tokenKeyword = (Tokens::Keyword*)tokens[pos + 1];
+				if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::While || tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+				{
+					auto tokenCycle = (Tokens::Keywords::Cycle*)tokens[pos + 1];
+					tokenCycle->name = name;
+					auto variable = tokens[++pos]->ParseVariables(parser);
+					return variable;
+				}
+			}
+			return nullptr;
+		}();
+		if(variable) return variable;
 	}
 
 	auto dataType = parser->SearchDataType(name);
@@ -731,65 +811,93 @@ LangE::Instruction*												LangE::Tokens::Keywords::While::Parse(Parser* par
 	auto &pos = parser->pos;
 	auto &tokens = *parser->tokens;
 
-	if(++pos < tokens.size())
+	if(cycle)
 	{
-		auto entryTestCondition = tokens[pos]->Parse(parser);
-		if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
+		parser->cycles.push_back(cycle);
+
+		if(++pos < tokens.size())
 		{
-			auto entryCondition = (Instructions::Variable*)entryTestCondition;
-			if(pos < tokens.size())
+			auto entryTestCondition = tokens[pos]->Parse(parser);
+			if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
 			{
-				auto instruction = tokens[pos]->Parse(parser);
+				auto entryCondition = (Instructions::Variable*)entryTestCondition;
 
-				if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+				cycle->entryCondition = entryCondition;
+
+				if(pos < tokens.size())
 				{
-					auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
-					if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
-					{
-						if(++pos < tokens.size())
-						{
-							auto leaveTestCondition = tokens[pos]->Parse(parser);
-							if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
-							{
-								auto leaveCondition = (Instructions::Variable*)leaveTestCondition;
+					auto instruction = tokens[pos]->Parse(parser);
 
-								auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,leaveCondition,instruction);
-								return keywordCycle;
+					cycle->instruction = instruction;
+
+					if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+					{
+						auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
+						if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+						{
+							if(++pos < tokens.size())
+							{
+								auto leaveTestCondition = tokens[pos]->Parse(parser);
+								if(entryTestCondition->GetInstructionType() == Instruction::Type::Variable)
+								{
+									auto leaveCondition = (Instructions::Variable*)leaveTestCondition;
+
+									parser->cycles.pop_back();
+
+									cycle->leaveCondition = leaveCondition;
+									//auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,leaveCondition,instruction);
+									//return keywordCycle;
+								}
+								else
+								{
+									throw std::exception("[.loop] leave condition are not variable");
+								}
 							}
 							else
 							{
-								throw std::exception("[.loop] leave condition are not variable");
+								throw std::exception("[.loop] no instruction ahead");
 							}
 						}
-						else
-						{
-							throw std::exception("[.loop] no instruction ahead");
-						}
 					}
-				}
 
-				auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,nullptr,instruction);
-				return keywordCycle;
+					return cycle;
+					//auto keywordCycle = new Instructions::Keywords::Cycle(entryCondition,nullptr,instruction);
+					//return keywordCycle;
+				}
+				else
+				{
+					throw std::exception("[.while] no instruction ahead");
+				}
 			}
 			else
 			{
-				throw std::exception("[.while] no instruction ahead");
+				throw std::exception("[.while] entry condition are not variable");
 			}
 		}
 		else
 		{
-			throw std::exception("[.while] entry condition are not variable");
+			throw std::exception("[.while] no condition ahead");
 		}
 	}
 	else
 	{
-		throw std::exception("[.while] no condition ahead");
+		throw std::exception("[.while] ???");
 	}
 }
 LangE::Instructions::Variable*									LangE::Tokens::Keywords::While::ParseVariables(Parser* parser)
 {
 	auto &pos = parser->pos;
 	auto &tokens = *parser->tokens;
+
+	if(cycle)
+	{
+		throw std::exception("");
+	}
+	else
+	{
+		cycle = new Instructions::Keywords::Cycle(nullptr, nullptr, nullptr, name);
+		parser->cycles.push_back(cycle);
+	}
 
 	if(++pos < tokens.size())
 	{
@@ -855,34 +963,76 @@ LangE::Instruction*												LangE::Tokens::Keywords::Loop::Parse(Parser* pars
 	auto &pos = parser->pos;
 	auto &tokens = *parser->tokens;
 
-	if(pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Keyword)
+	if(pos < tokens.size())
 	{
-		auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
-		if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+		if(tokens[pos]->GetTokenType() == Token::Type::Keyword)
 		{
-			if(++pos < tokens.size())
+			auto tokenKeyword = (Tokens::Keyword*)tokens[pos];
+			if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
 			{
-				auto instruction = tokens[pos]->Parse(parser);
-				if(instruction->GetInstructionType() == Instruction::Type::Variable)
+				if(++pos < tokens.size())
 				{
-					auto leaveCondition = (Instructions::Variable*)instruction;
-					auto cycle = new Instructions::Keywords::Cycle(nullptr,leaveCondition,inputInstruction);
-					return Parse(parser,cycle);
+					auto instruction = tokens[pos]->Parse(parser);
+					if(instruction->GetInstructionType() == Instruction::Type::Variable)
+					{
+						auto leaveCondition = (Instructions::Variable*)instruction;
+						auto cycle = new Instructions::Keywords::Cycle(nullptr, leaveCondition, inputInstruction);
+						return Parse(parser, cycle);
+					}
+					else
+					{
+						throw std::exception("[.loop] leave condition are not variable");
+					}
 				}
 				else
 				{
-					throw std::exception("[.loop] leave condition are not variable");
+					throw std::exception("[.loop] no leave condition ahead");
 				}
 			}
 			else
 			{
-				throw std::exception("[.loop] no leave condition ahead");
+				return inputInstruction;
 			}
 		}
-		else
+		if(tokens[pos]->GetTokenType() == Token::Type::Indetifier)
 		{
-			return inputInstruction;
+			auto tokenIndetifier = (Tokens::Indetifier*)tokens[pos];
+			if(tokens[pos + 1]->GetTokenType() == Token::Type::Keyword)
+			{
+				auto tokenKeyword = (Tokens::Keyword*)tokens[pos + 1];
+				if(tokenKeyword->GetKeywordType() == Tokens::Keyword::Type::Loop)
+				{
+					++pos;
+					if(++pos < tokens.size())
+					{
+						auto instruction = tokens[pos]->Parse(parser);
+						if(instruction->GetInstructionType() == Instruction::Type::Variable)
+						{
+							auto leaveCondition = (Instructions::Variable*)instruction;
+							auto cycle = new Instructions::Keywords::Cycle(nullptr, leaveCondition, inputInstruction, tokenIndetifier->name);
+							return Parse(parser, cycle);
+						}
+						else
+						{
+							throw std::exception("[.loop] leave condition are not variable");
+						}
+					}
+					else
+					{
+						throw std::exception("[.loop] no leave condition ahead");
+					}
+				}
+				else
+				{
+					return inputInstruction;
+				}
+			}
+			else
+			{
+				return inputInstruction;
+			}
 		}
+		return inputInstruction;
 	}
 	else
 	{
@@ -892,6 +1042,77 @@ LangE::Instruction*												LangE::Tokens::Keywords::Loop::Parse(Parser* pars
 LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Loop::GetKeywordType() const
 {
 	return Keyword::Type::Loop;
+}
+#pragma endregion
+#pragma region Repeat
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Repeat::GetKeywordType() const
+{
+	return Keyword::Type::Repeat;
+}
+LangE::Instruction*												LangE::Tokens::Keywords::Repeat::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	if(++pos < tokens.size())
+	{
+		if(tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+		{
+			++pos;
+
+			if(!parser->cycles.empty())
+			{
+				auto cycle = parser->cycles.back();
+				auto keywordRepeat = new Instructions::Keywords::Repeat(cycle);
+				//return keywordRepeat;
+			}
+			else
+			{
+				throw std::exception("[.repeat] can't find cycles");
+			}
+		}
+		/*if(tokens[pos]->GetTokenType() == Token::Type::Indetifier)
+		{
+			auto indetifier = (Tokens::Indetifier*)tokens[pos];
+
+			if(++pos < tokens.size() && tokens[pos]->GetTokenType() == Token::Type::Semicolon)
+			{
+				auto block = parser->SearchBlock(indetifier->name);
+				if(block)
+				{
+					++pos;
+					auto keywordBegin = new Instructions::Keywords::Begin(block);
+					return keywordBegin;
+				}
+				else
+				{
+					throw std::exception("[.begin] can't find block");
+				}
+			}
+			else
+			{
+				throw std::exception("[.repeat] no semicolon ahead");
+			}
+		}*/
+		throw std::exception("[.repeat] no semicolon ahead");
+	}
+	else
+	{
+		throw std::exception("[.repeat] no semicolon ahead");
+	}
+}
+#pragma endregion
+#pragma region Break
+LangE::Tokens::Keyword::Type									LangE::Tokens::Keywords::Break::GetKeywordType() const
+{
+	return Keyword::Type::Break;
+}
+LangE::Instruction*												LangE::Tokens::Keywords::Break::Parse(Parser* parser)
+{
+	auto &pos = parser->pos;
+	auto &tokens = *parser->tokens;
+
+	return nullptr;
 }
 #pragma endregion
 #pragma endregion
@@ -1142,10 +1363,11 @@ std::vector<LangE::uint8>										LangE::Instructions::Keywords::End::Compile(C
 }
 #pragma endregion
 #pragma region Cycle
-LangE::Instructions::Keywords::Cycle::Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_):
+LangE::Instructions::Keywords::Cycle::Cycle(Variable* entryCondition_,Variable* leaveCondition_,Instruction* instruction_,const std::string& name_):
 	entryCondition(entryCondition_),
 	leaveCondition(leaveCondition_),
-	instruction(instruction_)
+	instruction(instruction_),
+	name(name_)
 {
 }
 LangE::Instructions::Keyword::Type			LangE::Instructions::Keywords::Cycle::GetKeywordType() const
@@ -1155,6 +1377,8 @@ LangE::Instructions::Keyword::Type			LangE::Instructions::Keywords::Cycle::GetKe
 std::vector<LangE::uint8>					LangE::Instructions::Keywords::Cycle::Compile(Compiler* compiler)
 {
 	auto code = std::vector<uint8>{};
+
+	stackOffset = compiler->stackOffset;
 
 	if(entryCondition)
 	{
@@ -1243,6 +1467,57 @@ std::vector<LangE::uint8>					LangE::Instructions::Keywords::Cycle::Compile(Comp
 		}
 	}
 
+	for(auto i : jumpBegin)
+	{
+		auto jumpSize = -sint32(i->endJump);
+		auto jumpCode = compiler->JMP32(jumpSize);
+
+		for(std::size_t j = 0; j < jumpCode.size(); ++j)
+		{
+			code[i->beginJump + j] = jumpCode[j];
+		}
+	}
+	for(auto i : jumpEnd)
+	{
+		auto jumpSize = code.size() - i->endJump;
+		auto jumpCode = compiler->JMP32(jumpSize);
+
+		for(std::size_t j = 0; j < jumpCode.size(); ++j)
+		{
+			code[i->beginJump + j] = jumpCode[j];
+		}
+	}
+
+	return move(code);
+}
+#pragma endregion
+#pragma region Repeat
+LangE::Instructions::Keywords::Repeat::Repeat(Instructions::Keywords::Cycle* cycle_):
+	cycle(cycle_)
+{
+	cycle->jumpBegin.push_back(this);
+}
+LangE::Instructions::Keyword::Type								LangE::Instructions::Keywords::Repeat::GetKeywordType() const
+{
+	return Keyword::Type::Repeat;
+}
+std::vector<LangE::uint8>										LangE::Instructions::Keywords::Repeat::Compile(Compiler* compiler)
+{
+	auto code = std::vector<uint8>{};
+
+	auto offset = compiler->stackOffset - cycle->stackOffset;
+	if(offset > 0)
+	{
+		auto codeStackFree = compiler->Lea_ESP_LocESPPlus32(offset);
+		for(auto i : codeStackFree) code.push_back(i);
+	}
+
+	auto jumpCode = compiler->JMP32(0);
+
+	beginJump = code.size();
+	for(auto i : jumpCode) code.push_back(i);
+	endJump = code.size();
+
 	return code;
 }
 #pragma endregion
@@ -1275,7 +1550,7 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 
 				if(i < source.size())
 				{
-					if(isWhiteSpace(source[i]))
+					if(isWhiteSpace(source[i]) || isSemicolon(source[i]))
 					{
 						auto name = source.substr(oi,i - oi);
 
@@ -1308,6 +1583,14 @@ std::vector<LangE::Token*>										LangE::Lexer::Process(const std::string& sou
 							if(name == ".loop")
 							{
 								tokens.push_back(new Tokens::Keywords::Loop); --i; return;
+							}
+							if(name == ".repeat")
+							{
+								tokens.push_back(new Tokens::Keywords::Repeat); --i; return;
+							}
+							if(name == ".break")
+							{
+								tokens.push_back(new Tokens::Keywords::Break); --i; return;
 							}
 							throw std::exception("unsupported keyword type");
 						})();
@@ -1545,6 +1828,16 @@ LangE::Instructions::Block*										LangE::Parser::SearchBlock(const std::strin
 
 	return nullptr;
 }
+LangE::Instructions::Keywords::Cycle*							LangE::Parser::SearchCycle(const std::string& name)
+{
+	for(auto i = cycles.rbegin(); i != cycles.rend(); ++i)
+	{
+		auto cycle = *i;
+		if(cycle->name == name) return cycle;
+	}
+
+	return nullptr;
+}
 #pragma endregion
 #pragma region Compilers
 #pragma region ASM86
@@ -1661,6 +1954,10 @@ bool LangE::isLetter(char c)
 bool LangE::isWhiteSpace(char c)
 {
 	return c == ' ' || c == '\t' || c == '\n';
+}
+bool LangE::isSemicolon(char c)
+{
+	return c == ';';
 }
 std::vector<LangE::uint8>										LangE::Compile(const std::string& source)
 {
